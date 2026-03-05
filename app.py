@@ -1,826 +1,485 @@
 import streamlit as st
-import psycopg2
-import psycopg2.extras
+import gspread
+from google.oauth2.service_account import Credentials
 import bcrypt
-import jwt
 import smtplib
-import uuid
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime, timedelta
-from typing import Optional
-import os
+from datetime import datetime
+import uuid
+import plotly.express as px
+import pandas as pd
 
-# ─── PAGE CONFIG ────────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="MorepenPDR | Issue Management",
-    page_icon="💊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="MPDR Issue Tracker", page_icon="🔬", layout="wide", initial_sidebar_state="expanded")
 
-# ─── DARK THEME CSS ─────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-    .stApp { background-color: #0f1117; color: #e2e8f0; }
-
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1a1d2e 0%, #161827 100%);
-        border-right: 1px solid #2d3748;
-    }
-    section[data-testid="stSidebar"] * { color: #cbd5e0 !important; }
-
-    .main-header {
-        background: linear-gradient(135deg, #1e3a5f 0%, #2d1b69 100%);
-        padding: 2rem; border-radius: 12px; margin-bottom: 2rem;
-        border: 1px solid #2d4a7a;
-    }
-    .main-header h1 { color: #63b3ed; margin: 0; font-size: 1.8rem; font-weight: 700; }
-    .main-header p  { color: #90cdf4; margin: 0.5rem 0 0; font-size: 0.95rem; }
-
-    .metric-card {
-        background: #1a202c; border: 1px solid #2d3748;
-        border-radius: 10px; padding: 1.5rem; text-align: center;
-        transition: transform 0.2s; cursor: default;
-    }
-    .metric-card:hover { transform: translateY(-2px); border-color: #4a90d9; }
-    .metric-card .value { font-size: 2.2rem; font-weight: 700; color: #63b3ed; }
-    .metric-card .label { font-size: 0.85rem; color: #718096; margin-top: 0.3rem; }
-
-    .ticket-card {
-        background: #1a202c; border: 1px solid #2d3748;
-        border-radius: 10px; padding: 1.2rem; margin-bottom: 1rem;
-        border-left: 4px solid #4a90d9;
-    }
-    .ticket-card.priority-critical { border-left-color: #fc8181; }
-    .ticket-card.priority-high     { border-left-color: #f6ad55; }
-    .ticket-card.priority-medium   { border-left-color: #68d391; }
-    .ticket-card.priority-low      { border-left-color: #63b3ed; }
-
-    .status-badge {
-        display: inline-block; padding: 3px 10px;
-        border-radius: 20px; font-size: 0.75rem; font-weight: 600;
-    }
-    .status-OPEN        { background: #2d3748; color: #90cdf4; }
-    .status-ASSIGNED    { background: #2c5282; color: #bee3f8; }
-    .status-IN_PROGRESS { background: #744210; color: #fefcbf; }
-    .status-RESOLVED    { background: #1c4532; color: #9ae6b4; }
-    .status-CLOSED      { background: #171923; color: #718096; }
-
-    .priority-badge {
-        display: inline-block; padding: 3px 10px;
-        border-radius: 20px; font-size: 0.75rem; font-weight: 600; margin-left: 8px;
-    }
-    .priority-CRITICAL { background: #742a2a; color: #fc8181; }
-    .priority-HIGH     { background: #744210; color: #f6ad55; }
-    .priority-MEDIUM   { background: #1c4532; color: #68d391; }
-    .priority-LOW      { background: #1a365d; color: #63b3ed; }
-
-    div[data-testid="stButton"] > button {
-        background: linear-gradient(135deg, #2b6cb0, #1a365d);
-        color: white; border: none; border-radius: 8px;
-        padding: 0.5rem 1.5rem; font-weight: 500;
-        transition: all 0.2s;
-    }
-    div[data-testid="stButton"] > button:hover {
-        background: linear-gradient(135deg, #3182ce, #2b6cb0);
-        transform: translateY(-1px);
-    }
-
-    div[data-testid="stTextInput"] input,
-    div[data-testid="stTextArea"] textarea,
-    div[data-testid="stSelectbox"] select {
-        background: #2d3748 !important; color: #e2e8f0 !important;
-        border: 1px solid #4a5568 !important; border-radius: 8px !important;
-    }
-
-    .stDataFrame { background: #1a202c; border-radius: 10px; }
-
-    .login-container {
-        max-width: 420px; margin: 5rem auto;
-        background: #1a202c; border: 1px solid #2d3748;
-        border-radius: 16px; padding: 2.5rem;
-    }
-
-    .section-title {
-        color: #63b3ed; font-size: 1.1rem; font-weight: 600;
-        margin-bottom: 1rem; padding-bottom: 0.5rem;
-        border-bottom: 1px solid #2d3748;
-    }
-
-    .info-box {
-        background: #1a2744; border: 1px solid #2c5282;
-        border-radius: 8px; padding: 1rem; margin: 0.5rem 0;
-        color: #90cdf4; font-size: 0.9rem;
-    }
-    .success-box {
-        background: #1c3a2a; border: 1px solid #276749;
-        border-radius: 8px; padding: 1rem; margin: 0.5rem 0;
-        color: #9ae6b4; font-size: 0.9rem;
-    }
-    .warning-box {
-        background: #3d2a0e; border: 1px solid #975a16;
-        border-radius: 8px; padding: 1rem; margin: 0.5rem 0;
-        color: #fbd38d; font-size: 0.9rem;
-    }
-
-    .stTabs [data-baseweb="tab"] { color: #718096; }
-    .stTabs [aria-selected="true"] { color: #63b3ed !important; }
-    .stTabs [data-baseweb="tab-border"] { background-color: #63b3ed; }
-    .stTabs [data-baseweb="tab-list"] { background-color: #1a202c; border-radius: 8px; }
-
-    hr { border-color: #2d3748; }
-    label { color: #a0aec0 !important; }
-    .stAlert { border-radius: 8px; }
-    
-    /* Hide Streamlit branding */
-    #MainMenu { visibility: hidden; }
-    footer    { visibility: hidden; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+* { font-family: 'Inter', sans-serif !important; }
+.stApp { background: linear-gradient(135deg,#0a0e1a 0%,#0d1117 50%,#0a0e1a 100%); color:#e6edf3; }
+.main .block-container { padding:1.5rem 2rem 2rem 2rem; max-width:1400px; }
+section[data-testid="stSidebar"] { background: linear-gradient(180deg,#0d1117 0%,#161b22 100%); border-right: 1px solid #21262d; }
+section[data-testid="stSidebar"] * { color:#e6edf3 !important; }
+section[data-testid="stSidebar"] .stButton button { background:transparent !important; color:#8b949e !important; border:1px solid transparent !important; border-radius:8px !important; text-align:left !important; padding:0.6rem 1rem !important; font-size:0.88rem !important; font-weight:500 !important; transition:all 0.2s !important; width:100% !important; }
+section[data-testid="stSidebar"] .stButton button:hover { background:#21262d !important; color:#58a6ff !important; border-color:#30363d !important; }
+.stat-card { background:linear-gradient(135deg,#161b22,#1c2128); border:1px solid #21262d; border-radius:12px; padding:1.4rem 1.6rem; text-align:center; }
+.stat-number { font-size:2.4rem; font-weight:700; line-height:1; }
+.stat-label { font-size:0.82rem; color:#8b949e; margin-top:0.4rem; text-transform:uppercase; letter-spacing:0.05em; }
+.info-card { background:#161b22; border:1px solid #21262d; border-radius:12px; padding:1.2rem 1.4rem; margin-bottom:0.8rem; }
+.ticket-card { background:linear-gradient(135deg,#161b22,#1c2128); border:1px solid #21262d; border-left:4px solid #58a6ff; border-radius:10px; padding:1.2rem 1.4rem; margin-bottom:0.8rem; }
+.ticket-card.critical { border-left-color:#ff4444; }
+.ticket-card.high { border-left-color:#ff7b72; }
+.ticket-card.medium { border-left-color:#f0a500; }
+.ticket-card.low { border-left-color:#3fb950; }
+.ticket-id { font-size:0.75rem; color:#8b949e; font-family:monospace !important; }
+.ticket-title { font-size:1.05rem; font-weight:600; color:#e6edf3; margin:0.2rem 0; }
+.ticket-desc { font-size:0.88rem; color:#8b949e; margin-top:0.3rem; line-height:1.5; }
+.ticket-meta { font-size:0.8rem; color:#6e7681; margin-top:0.6rem; }
+.badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:0.72rem; font-weight:600; letter-spacing:0.03em; text-transform:uppercase; }
+.b-open { background:#1f3a5f; color:#58a6ff; border:1px solid #1f6feb; }
+.b-assigned { background:#3d2b00; color:#f0a500; border:1px solid #9e6a03; }
+.b-inprog { background:#1a3a1a; color:#3fb950; border:1px solid #238636; }
+.b-resolved { background:#1b3a2d; color:#56d364; border:1px solid #2ea043; }
+.b-closed { background:#21262d; color:#8b949e; border:1px solid #30363d; }
+.b-low { background:#1a3a1a; color:#3fb950; }
+.b-medium { background:#3d2b00; color:#f0a500; }
+.b-high { background:#4d1a00; color:#ff7b72; }
+.b-critical { background:#5a0000; color:#ff4444; }
+.page-header { background:linear-gradient(135deg,#161b22,#1c2128); border:1px solid #21262d; border-radius:12px; padding:1.4rem 1.8rem; margin-bottom:1.5rem; }
+.page-title { font-size:1.6rem; font-weight:700; color:#e6edf3; margin:0; }
+.page-sub { font-size:0.88rem; color:#8b949e; margin-top:0.3rem; }
+.stTextInput input, .stTextArea textarea { background:#21262d !important; color:#e6edf3 !important; border:1px solid #30363d !important; border-radius:8px !important; }
+.stButton > button { background:linear-gradient(135deg,#238636,#2ea043) !important; color:white !important; border:none !important; border-radius:8px !important; padding:0.55rem 1.4rem !important; font-weight:600 !important; }
+.stTabs [data-baseweb="tab-list"] { background:#161b22; border-radius:8px; padding:4px; gap:4px; border:1px solid #21262d; }
+.stTabs [data-baseweb="tab"] { background:transparent !important; color:#8b949e !important; border-radius:6px !important; padding:0.5rem 1.2rem !important; font-weight:500 !important; }
+.stTabs [aria-selected="true"] { background:#21262d !important; color:#58a6ff !important; }
+hr { border-color:#21262d; }
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:#0d1117; }
+::-webkit-scrollbar-thumb { background:#30363d; border-radius:3px; }
 </style>
 """, unsafe_allow_html=True)
 
-# ─── CONFIG ─────────────────────────────────────────────────────────────────────
-SECRET_KEY  = st.secrets.get("SECRET_KEY",  "pharma-ims-secret-2024")
-ALLOWED_DOMAIN = "@morepenpdr.com"
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"]
 
-DEPARTMENTS = ["IT", "Lab Maintenance", "Safety", "HR", "Facilities"]
-CATEGORIES  = ["Equipment Failure", "Software Issue", "Safety Hazard",
-                "Lab Supply", "Network/Connectivity", "HVAC/Environment",
-                "Chemical Spill", "Documentation", "Other"]
-PRIORITIES  = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
-ROLES       = ["scientist", "admin", "management"]
+@st.cache_resource(show_spinner=False)
+def get_client():
+    creds = Credentials.from_service_account_info(dict(st.secrets["gcp_service_account"]), scopes=SCOPES)
+    return gspread.authorize(creds)
 
-DEPT_EMAILS = {
-    "IT":               st.secrets.get("IT_EMAIL",          "it@morepenpdr.com"),
-    "Lab Maintenance":  st.secrets.get("LAB_EMAIL",         "lab@morepenpdr.com"),
-    "Safety":           st.secrets.get("SAFETY_EMAIL",      "safety@morepenpdr.com"),
-    "HR":               st.secrets.get("HR_EMAIL",          "hr@morepenpdr.com"),
-    "Facilities":       st.secrets.get("FACILITIES_EMAIL",  "facilities@morepenpdr.com"),
-}
+def sheet(tab):
+    return get_client().open("MPDR Issue Tracker").worksheet(tab)
 
-# ─── DATABASE ───────────────────────────────────────────────────────────────────
-@st.cache_resource
-def get_db():
-    return psycopg2.connect(
-        host=st.secrets["DB_HOST"],
-        port=st.secrets.get("DB_PORT", 5432),
-        dbname=st.secrets["DB_NAME"],
-        user=st.secrets["DB_USER"],
-        password=st.secrets["DB_PASSWORD"],
-        sslmode="require",
-        cursor_factory=psycopg2.extras.RealDictCursor
-    )
+NOTIFY_EMAILS = ["admin@morepenpdr.com","mpdr.services@gmail.com"]
 
-def db():
-    conn = get_db()
-    if conn.closed:
-        st.cache_resource.clear()
-        conn = get_db()
-    return conn
-
-def run(sql, params=None, fetch="all"):
-    conn = db()
-    with conn.cursor() as cur:
-        cur.execute(sql, params or ())
-        conn.commit()
-        if fetch == "all":
-            try:    return cur.fetchall()
-            except: return []
-        if fetch == "one":
-            try:    return cur.fetchone()
-            except: return None
-        return None
-
-# ─── EMAIL ──────────────────────────────────────────────────────────────────────
-def send_email(to: str, subject: str, html: str):
+def send_email(to_list, subject, html_body):
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = st.secrets["SMTP_FROM"]
-        msg["To"]      = to
-        msg.attach(MIMEText(html, "html"))
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as srv:
-            srv.login(st.secrets["SMTP_USER"], st.secrets["SMTP_PASS"])
-            srv.sendmail(st.secrets["SMTP_FROM"], to, msg.as_string())
+        user = st.secrets["gmail"]["user"]
+        pwd  = st.secrets["gmail"]["app_password"]
+        targets = to_list if isinstance(to_list,list) else [to_list]
+        for to_email in targets:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"]    = f"MPDR Issue Tracker <{user}>"
+            msg["To"]      = to_email
+            msg.attach(MIMEText(html_body,"html"))
+            with smtplib.SMTP_SSL("smtp.gmail.com",465) as srv:
+                srv.login(user,pwd)
+                srv.sendmail(user,to_email,msg.as_string())
         return True
     except Exception as e:
-        st.warning(f"Email not sent ({e}). Check SMTP secrets.")
+        st.toast(f"Email error: {e}",icon="⚠️")
         return False
 
-def email_ticket_created(ticket, reporter_email, dept_email):
-    html = f"""
-    <div style="font-family:Inter,sans-serif;background:#0f1117;color:#e2e8f0;padding:30px;border-radius:12px;">
-      <div style="background:linear-gradient(135deg,#1e3a5f,#2d1b69);padding:20px;border-radius:8px;margin-bottom:20px;">
-        <h2 style="color:#63b3ed;margin:0;">💊 MorepenPDR — New Ticket #{ticket['ticket_id'][:8]}</h2>
-      </div>
-      <table style="width:100%;border-collapse:collapse;">
-        <tr><td style="padding:8px;color:#718096;">Title</td>
-            <td style="padding:8px;color:#e2e8f0;font-weight:600;">{ticket['title']}</td></tr>
-        <tr style="background:#1a202c;">
-            <td style="padding:8px;color:#718096;">Category</td>
-            <td style="padding:8px;color:#e2e8f0;">{ticket['category']}</td></tr>
-        <tr><td style="padding:8px;color:#718096;">Priority</td>
-            <td style="padding:8px;color:#f6ad55;font-weight:600;">{ticket['priority']}</td></tr>
-        <tr style="background:#1a202c;">
-            <td style="padding:8px;color:#718096;">Reported by</td>
-            <td style="padding:8px;color:#e2e8f0;">{reporter_email}</td></tr>
-        <tr><td style="padding:8px;color:#718096;">Description</td>
-            <td style="padding:8px;color:#e2e8f0;">{ticket['description']}</td></tr>
-      </table>
-      <p style="color:#718096;margin-top:20px;font-size:0.85rem;">
-        Login to the portal to manage this ticket.
-      </p>
-    </div>"""
-    send_email(dept_email, f"[MorepenPDR] New {ticket['priority']} Ticket: {ticket['title']}", html)
+def email_new_ticket(t):
+    subj = f"[MPDR] New Ticket #{t['ticket_id'][:8].upper()} — {t['priority']} Priority"
+    html = f"""<div style="font-family:Arial,sans-serif;background:#0d1117;color:#e6edf3;padding:30px;border-radius:12px;max-width:600px;margin:0 auto;">
+<div style="text-align:center;margin-bottom:24px;"><div style="font-size:2rem;">🔬</div>
+<h2 style="color:#58a6ff;margin:8px 0 4px 0;">MPDR Issue Tracker</h2>
+<p style="color:#8b949e;font-size:0.85rem;margin:0;">Morepen Laboratories — New Issue Reported</p></div>
+<div style="background:#161b22;border:1px solid #21262d;border-left:4px solid #58a6ff;border-radius:10px;padding:20px;margin-bottom:16px;">
+<table style="width:100%;border-collapse:collapse;">
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;width:140px;">TICKET ID</td><td style="color:#58a6ff;font-family:monospace;font-weight:600;">#{t['ticket_id'][:8].upper()}</td></tr>
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">TITLE</td><td style="color:#e6edf3;font-weight:600;">{t['title']}</td></tr>
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">DEPARTMENT</td><td style="color:#e6edf3;">{t['assigned_to']}</td></tr>
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">PRIORITY</td><td><span style="background:#4d1a00;color:#ff7b72;padding:2px 8px;border-radius:10px;font-size:0.78rem;font-weight:600;">{t['priority']}</span></td></tr>
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">CATEGORY</td><td style="color:#e6edf3;">{t['category']}</td></tr>
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">REPORTED BY</td><td style="color:#e6edf3;">{t['created_by']}</td></tr>
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">CREATED AT</td><td style="color:#e6edf3;">{t['created_at']}</td></tr>
+</table></div>
+<div style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:16px;margin-bottom:16px;">
+<p style="color:#8b949e;font-size:0.82rem;margin:0 0 6px 0;">DESCRIPTION</p>
+<p style="color:#e6edf3;margin:0;line-height:1.6;">{t['description']}</p></div>
+<p style="color:#8b949e;font-size:0.8rem;text-align:center;">Login to MPDR Issue Tracker to manage this ticket.</p></div>"""
+    send_email(NOTIFY_EMAILS, subj, html)
 
-def email_feedback_request(ticket, reporter_email):
-    feedback_url = f"https://your-app.streamlit.app/?feedback={ticket['ticket_id']}"
-    html = f"""
-    <div style="font-family:Inter,sans-serif;background:#0f1117;color:#e2e8f0;padding:30px;border-radius:12px;">
-      <div style="background:linear-gradient(135deg,#1c4532,#276749);padding:20px;border-radius:8px;margin-bottom:20px;">
-        <h2 style="color:#9ae6b4;margin:0;">✅ Your Issue Has Been Resolved!</h2>
-      </div>
-      <p>Hello,</p>
-      <p>Your ticket <strong style="color:#63b3ed;">"{ticket['title']}"</strong> has been marked as resolved.</p>
-      <p style="color:#718096;">Ticket ID: {ticket['ticket_id'][:8]}</p>
-      <p>Please log in to the portal to rate your experience and provide feedback. Your feedback helps us improve our support quality.</p>
-      <div style="background:#1a202c;border:1px solid #2d3748;border-radius:8px;padding:15px;margin:20px 0;">
-        <p style="color:#718096;margin:0;">Rate 1–5 stars and leave a comment directly in the portal under <strong>My Tickets → Feedback</strong>.</p>
-      </div>
-      <p style="color:#718096;font-size:0.85rem;">Thank you for helping us improve — MorepenPDR IT & Support</p>
-    </div>"""
-    send_email(reporter_email, f"[MorepenPDR] Please Rate Your Support Experience — #{ticket['ticket_id'][:8]}", html)
+def email_resolved(t):
+    subj = f"[MPDR] ✅ Your ticket #{t['ticket_id'][:8].upper()} has been resolved"
+    notes_block = f"""<div style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:16px;margin-bottom:16px;">
+<p style="color:#8b949e;font-size:0.82rem;margin:0 0 6px 0;">RESOLUTION NOTES</p>
+<p style="color:#e6edf3;margin:0;line-height:1.6;">{t.get('resolution_notes','')}</p></div>""" if t.get('resolution_notes') else ""
+    html = f"""<div style="font-family:Arial,sans-serif;background:#0d1117;color:#e6edf3;padding:30px;border-radius:12px;max-width:600px;margin:0 auto;">
+<div style="text-align:center;margin-bottom:24px;"><div style="font-size:2.5rem;">✅</div>
+<h2 style="color:#3fb950;margin:8px 0 4px 0;">Issue Resolved!</h2>
+<p style="color:#8b949e;font-size:0.85rem;margin:0;">Your issue has been resolved by the {t['assigned_to']} team</p></div>
+<div style="background:#1b3a2d;border:1px solid #238636;border-radius:10px;padding:20px;margin-bottom:16px;">
+<table style="width:100%;border-collapse:collapse;">
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;width:140px;">TICKET ID</td><td style="color:#58a6ff;font-family:monospace;font-weight:600;">#{t['ticket_id'][:8].upper()}</td></tr>
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">TITLE</td><td style="color:#e6edf3;font-weight:600;">{t['title']}</td></tr>
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">RESOLVED BY</td><td style="color:#e6edf3;">{t['assigned_to']} Team</td></tr>
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">RESOLVED AT</td><td style="color:#e6edf3;">{t['updated_at']}</td></tr>
+</table></div>
+{notes_block}
+<div style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:20px;text-align:center;margin-bottom:16px;">
+<p style="color:#e6edf3;font-weight:600;margin:0 0 8px 0;">How was our support?</p>
+<p style="color:#8b949e;font-size:0.85rem;margin:0;">Please login to <strong style="color:#58a6ff;">MPDR Issue Tracker</strong> and submit your star rating feedback to close the ticket.</p></div>
+<p style="color:#8b949e;font-size:0.8rem;text-align:center;">MPDR Issue Tracker · Morepen Laboratories</p></div>"""
+    send_email(t['created_by'], subj, html)
 
-# ─── AUTH ────────────────────────────────────────────────────────────────────────
-def hash_password(pw: str) -> str:
-    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+def all_users():    return sheet("users").get_all_records()
+def get_user(e):    return next((u for u in all_users() if u["email"]==e), None)
+def register_user(email,password,role,dept=""):
+    h = bcrypt.hashpw(password.encode(),bcrypt.gensalt()).decode()
+    sheet("users").append_row([email,h,role,dept,datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+def check_pw(pw,h): return bcrypt.checkpw(pw.encode(),h.encode())
 
-def verify_password(pw: str, hashed: str) -> bool:
-    return bcrypt.checkpw(pw.encode(), hashed.encode())
+def all_tickets():  return sheet("tickets").get_all_records()
+def find_row(tid):
+    ws=sheet("tickets"); recs=ws.get_all_records()
+    for i,r in enumerate(recs,start=2):
+        if r["ticket_id"]==tid: return ws,i,r
+    return None,None,None
 
-def create_token(user_id: str) -> str:
-    payload = {"sub": user_id, "exp": datetime.utcnow() + timedelta(hours=8)}
-    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+def create_ticket(title,desc,cat,prio,dept,creator):
+    tid=str(uuid.uuid4()); now=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sheet("tickets").append_row([tid,title,desc,cat,prio,"OPEN",creator,dept,now,now,""])
+    t=dict(ticket_id=tid,title=title,description=desc,category=cat,priority=prio,
+           status="OPEN",created_by=creator,assigned_to=dept,created_at=now,updated_at=now,resolution_notes="")
+    email_new_ticket(t); return tid
 
-def verify_token(token: str) -> Optional[str]:
-    try:
-        data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        return data["sub"]
-    except:
-        return None
+def update_ticket(tid,status,notes=""):
+    ws,row,t=find_row(tid)
+    if not row: return
+    now=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ws.update_cell(row,6,status); ws.update_cell(row,10,now)
+    if notes: ws.update_cell(row,11,notes)
+    if status=="RESOLVED":
+        t["resolution_notes"]=notes; t["updated_at"]=now; email_resolved(t)
 
-def login_user(email: str, password: str):
-    if not email.endswith(ALLOWED_DOMAIN):
-        return None, f"Only {ALLOWED_DOMAIN} emails are allowed."
-    user = run("SELECT * FROM users WHERE email=%s AND is_active=TRUE", (email,), "one")
-    if not user:
-        return None, "User not found or account inactive."
-    if not verify_password(password, user["password_hash"]):
-        return None, "Incorrect password."
-    return dict(user), None
+def all_feedback():   return sheet("feedback").get_all_records()
+def has_fb(tid):      return any(f["ticket_id"]==tid for f in all_feedback())
+def submit_fb(tid,by,rating,comments):
+    sheet("feedback").append_row([tid,by,rating,comments,datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+    update_ticket(tid,"CLOSED")
 
-def register_user(name, email, password, role, department=None):
-    if not email.endswith(ALLOWED_DOMAIN):
-        return False, f"Only {ALLOWED_DOMAIN} emails are allowed."
-    existing = run("SELECT id FROM users WHERE email=%s", (email,), "one")
-    if existing:
-        return False, "Email already registered."
-    uid = str(uuid.uuid4())
-    run("""INSERT INTO users(id,name,email,password_hash,role,department,is_active,created_at)
-           VALUES(%s,%s,%s,%s,%s,%s,TRUE,%s)""",
-        (uid, name, email, hash_password(password), role, department, datetime.utcnow()))
-    return True, "Account created successfully."
+SC={"OPEN":"b-open","ASSIGNED":"b-assigned","IN_PROGRESS":"b-inprog","RESOLVED":"b-resolved","CLOSED":"b-closed"}
+PC={"Low":"b-low","Medium":"b-medium","High":"b-high","Critical":"b-critical"}
+PB={"Low":"low","Medium":"medium","High":"high","Critical":"critical"}
+def sb(s): return f'<span class="badge {SC.get(s,"b-open")}">{s}</span>'
+def pb(p): return f'<span class="badge {PC.get(p,"b-low")}">{p}</span>'
+def st_stars(n): return "⭐"*int(n)+"☆"*(5-int(n))
 
-# ─── SESSION ────────────────────────────────────────────────────────────────────
-def get_current_user():
-    token = st.session_state.get("token")
-    if not token:
-        return None
-    uid = verify_token(token)
-    if not uid:
-        return None
-    user = run("SELECT * FROM users WHERE id=%s", (uid,), "one")
-    return dict(user) if user else None
+for k,v in [("logged_in",False),("email",""),("role",""),("dept",""),("page","login")]:
+    if k not in st.session_state: st.session_state[k]=v
 
-# ─── TICKET HELPERS ─────────────────────────────────────────────────────────────
-def create_ticket(title, description, category, priority, assigned_to_dept, created_by_id):
-    tid = str(uuid.uuid4())
-    now = datetime.utcnow()
-    run("""INSERT INTO tickets(id,title,description,category,priority,status,
-                               created_by,assigned_to_dept,created_at,updated_at)
-           VALUES(%s,%s,%s,%s,%s,'OPEN',%s,%s,%s,%s)""",
-        (tid, title, description, category, priority, created_by_id, assigned_to_dept, now, now))
-    return tid
+def login_page():
+    c1,c2,c3=st.columns([1,1.1,1])
+    with c2:
+        st.markdown("""<div style="text-align:center;padding:2rem 0 1.5rem 0;">
+<div style="font-size:3rem;">🔬</div>
+<h1 style="color:#58a6ff;font-size:2rem;font-weight:700;margin:0.5rem 0 0.2rem 0;">MPDR Issue Tracker</h1>
+<p style="color:#8b949e;font-size:0.9rem;margin:0;">Morepen Laboratories · Pharmaceutical Research Division</p></div>""",unsafe_allow_html=True)
 
-def update_ticket_status(ticket_id, new_status, note, updated_by):
-    now = datetime.utcnow()
-    run("UPDATE tickets SET status=%s,updated_at=%s WHERE id=%s", (new_status, now, ticket_id))
-    run("""INSERT INTO ticket_updates(id,ticket_id,updated_by,old_status,new_status,note,created_at)
-           VALUES(%s,%s,%s,(SELECT status FROM tickets WHERE id=%s),%s,%s,%s)""",
-        (str(uuid.uuid4()), ticket_id, updated_by, ticket_id, new_status, note, now))
-
-def submit_feedback(ticket_id, rating, comment):
-    run("""INSERT INTO feedback(id,ticket_id,rating,comment,created_at)
-           VALUES(%s,%s,%s,%s,%s)
-           ON CONFLICT(ticket_id) DO UPDATE SET rating=%s,comment=%s,created_at=%s""",
-        (str(uuid.uuid4()), ticket_id, rating, comment, datetime.utcnow(),
-         rating, comment, datetime.utcnow()))
-
-# ─── UI HELPERS ─────────────────────────────────────────────────────────────────
-def badge(text, kind="status"):
-    return f'<span class="{kind}-badge {kind}-{text}">{text}</span>'
-
-def ticket_card(t, show_actions=False, user=None):
-    priority_color = {"CRITICAL":"#fc8181","HIGH":"#f6ad55","MEDIUM":"#68d391","LOW":"#63b3ed"}
-    border = priority_color.get(t.get("priority","LOW"), "#4a90d9")
-    st.markdown(f"""
-    <div class="ticket-card" style="border-left-color:{border}">
-      <div style="display:flex;justify-content:space-between;align-items:start;">
-        <div>
-          <span style="color:#63b3ed;font-size:0.75rem;font-weight:600;">
-            #{str(t['id'])[:8].upper()}
-          </span>
-          <h4 style="color:#e2e8f0;margin:4px 0;">{t['title']}</h4>
-        </div>
-        <div>
-          {badge(t['status'],'status')}
-          {badge(t['priority'],'priority')}
-        </div>
-      </div>
-      <p style="color:#a0aec0;font-size:0.88rem;margin:8px 0;">{t['description'][:200]}{"..." if len(t['description'])>200 else ""}</p>
-      <div style="display:flex;gap:20px;font-size:0.8rem;color:#718096;margin-top:8px;">
-        <span>📂 {t['category']}</span>
-        <span>🏢 {t['assigned_to_dept']}</span>
-        <span>🕐 {str(t['created_at'])[:16]}</span>
-      </div>
-    </div>""", unsafe_allow_html=True)
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# LOGIN PAGE
-# ═══════════════════════════════════════════════════════════════════════════════
-def page_login():
-    col1, col2, col3 = st.columns([1, 1.2, 1])
-    with col2:
-        st.markdown("""
-        <div style="text-align:center;margin-bottom:2rem;">
-          <div style="font-size:3rem;">💊</div>
-          <h1 style="color:#63b3ed;font-size:1.6rem;margin:0;">MorepenPDR</h1>
-          <p style="color:#718096;font-size:0.9rem;">Issue Management System</p>
-        </div>""", unsafe_allow_html=True)
-
-        tab_login, tab_register = st.tabs(["🔐 Sign In", "📝 Register"])
-
-        with tab_login:
-            st.markdown("<br>", unsafe_allow_html=True)
-            email = st.text_input("Email", placeholder="you@morepenpdr.com", key="li_email")
-            password = st.text_input("Password", type="password", key="li_pass")
-            if st.button("Sign In", use_container_width=True):
-                if email and password:
-                    user, err = login_user(email.strip().lower(), password)
-                    if user:
-                        st.session_state.token = create_token(user["id"])
-                        st.rerun()
-                    else:
-                        st.error(err)
+        t1,t2=st.tabs(["🔐  Sign In","📝  Register"])
+        with t1:
+            st.markdown("<br>",unsafe_allow_html=True)
+            email=st.text_input("Company Email",placeholder="yourname@morepenpdr.com",key="li_e")
+            pwd  =st.text_input("Password",type="password",key="li_p")
+            st.markdown("<br>",unsafe_allow_html=True)
+            if st.button("Sign In →",use_container_width=True,key="btn_li"):
+                if not email.endswith("@morepenpdr.com"):
+                    st.error("⛔ Only @morepenpdr.com emails are allowed.")
                 else:
-                    st.warning("Please enter email and password.")
+                    u=get_user(email)
+                    if u and check_pw(pwd,str(u["password"])):
+                        st.session_state.logged_in=True; st.session_state.email=email
+                        st.session_state.role=u["role"]; st.session_state.dept=u["department"]
+                        st.session_state.page="home"; st.rerun()
+                    else: st.error("Invalid email or password.")
 
-        with tab_register:
-            st.markdown("<br>", unsafe_allow_html=True)
-            name  = st.text_input("Full Name", key="reg_name")
-            email = st.text_input("Email (@morepenpdr.com)", key="reg_email")
-            role  = st.selectbox("Role", ["scientist", "admin", "management"], key="reg_role")
-            dept  = st.selectbox("Department (Admin only)", ["—"] + DEPARTMENTS, key="reg_dept") \
-                    if role == "admin" else None
-            pwd1  = st.text_input("Password", type="password", key="reg_p1")
-            pwd2  = st.text_input("Confirm Password", type="password", key="reg_p2")
-            if st.button("Create Account", use_container_width=True):
-                if not all([name, email, pwd1, pwd2]):
-                    st.warning("All fields required.")
-                elif pwd1 != pwd2:
-                    st.error("Passwords do not match.")
-                else:
-                    ok, msg = register_user(
-                        name.strip(), email.strip().lower(), pwd1,
-                        role, dept if dept and dept != "—" else None
-                    )
-                    if ok: st.success(msg + " Please sign in.")
-                    else:  st.error(msg)
+        with t2:
+            st.markdown("<br>",unsafe_allow_html=True)
+            re=st.text_input("Company Email",placeholder="yourname@morepenpdr.com",key="re_e")
+            rp=st.text_input("Password (min 6 chars)",type="password",key="re_p")
+            rp2=st.text_input("Confirm Password",type="password",key="re_p2")
+            rr=st.selectbox("Role",["scientist","admin","management"],key="re_r")
+            rd=""
+            if rr=="admin": rd=st.selectbox("Department",["IT","Lab Maintenance","Safety"],key="re_d")
+            st.markdown("<br>",unsafe_allow_html=True)
+            if st.button("Create Account →",use_container_width=True,key="btn_re"):
+                if not re.endswith("@morepenpdr.com"): st.error("⛔ Only @morepenpdr.com emails allowed.")
+                elif get_user(re): st.error("Email already registered.")
+                elif len(rp)<6: st.error("Password must be at least 6 characters.")
+                elif rp!=rp2: st.error("Passwords do not match.")
+                else: register_user(re,rp,rr,rd); st.success("✅ Account created! Please sign in.")
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# SCIENTIST DASHBOARD
-# ═══════════════════════════════════════════════════════════════════════════════
-def page_scientist(user):
-    st.markdown(f"""
-    <div class="main-header">
-      <h1>🔬 Scientist Portal</h1>
-      <p>Welcome, {user['name']} · {user['email']}</p>
-    </div>""", unsafe_allow_html=True)
+        st.markdown('<p style="text-align:center;color:#6e7681;font-size:0.78rem;margin-top:2rem;">🔒 Secure · Only @morepenpdr.com accounts permitted</p>',unsafe_allow_html=True)
 
-    tab1, tab2, tab3 = st.tabs(["➕ New Ticket", "📋 My Tickets", "⭐ Feedback"])
-
-    # ── NEW TICKET ──────────────────────────────────────────────────────────────
-    with tab1:
-        st.markdown('<p class="section-title">Report a New Issue</p>', unsafe_allow_html=True)
-        col_a, col_b = st.columns(2)
-        with col_a:
-            title    = st.text_input("Issue Title *")
-            category = st.selectbox("Category *", CATEGORIES)
-            priority = st.selectbox("Priority *", PRIORITIES, index=1)
-        with col_b:
-            dept = st.selectbox("Assign to Department *", DEPARTMENTS)
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown(f"""<div class="info-box">
-              📧 This ticket will be emailed to:<br>
-              <strong>{DEPT_EMAILS.get(dept,'dept@morepenpdr.com')}</strong>
-            </div>""", unsafe_allow_html=True)
-        description = st.text_area("Detailed Description *", height=120)
-
-        if st.button("🚀 Submit Ticket", use_container_width=True):
-            if title and description and category and dept:
-                tid = create_ticket(title, description, category, priority, dept, user["id"])
-                ticket = run("SELECT * FROM tickets WHERE id=%s", (tid,), "one")
-                email_ticket_created(dict(ticket), user["email"], DEPT_EMAILS.get(dept,""))
-                st.markdown(f"""<div class="success-box">
-                  ✅ Ticket <strong>#{tid[:8].upper()}</strong> submitted and email sent to {dept} team.
-                </div>""", unsafe_allow_html=True)
-            else:
-                st.warning("Please fill in all required fields.")
-
-    # ── MY TICKETS ──────────────────────────────────────────────────────────────
-    with tab2:
-        tickets = run("""
-            SELECT t.*, f.rating, f.comment as feedback_comment
-            FROM tickets t
-            LEFT JOIN feedback f ON f.ticket_id = t.id
-            WHERE t.created_by=%s ORDER BY t.created_at DESC
-        """, (user["id"],))
-
-        search = st.text_input("🔍 Search tickets", placeholder="Search by title or category")
-        status_filter = st.multiselect("Filter by Status", ["OPEN","ASSIGNED","IN_PROGRESS","RESOLVED","CLOSED"])
-
-        if not tickets:
-            st.info("You have not submitted any tickets yet.")
-        else:
-            df = [dict(t) for t in tickets]
-            if search:
-                df = [t for t in df if search.lower() in t["title"].lower()
-                      or search.lower() in t["category"].lower()]
-            if status_filter:
-                df = [t for t in df if t["status"] in status_filter]
-            for t in df:
-                ticket_card(t)
-
-    # ── FEEDBACK ─────────────────────────────────────────────────────────────────
-    with tab3:
-        resolved = run("""
-            SELECT t.*, f.rating, f.comment as feedback_comment
-            FROM tickets t LEFT JOIN feedback f ON f.ticket_id=t.id
-            WHERE t.created_by=%s AND t.status IN ('RESOLVED','CLOSED')
-            ORDER BY t.updated_at DESC
-        """, (user["id"],))
-
-        if not resolved:
-            st.info("No resolved tickets yet. Feedback will appear here once your tickets are resolved.")
-        else:
-            for t in resolved:
-                t = dict(t)
-                with st.expander(f"#{t['id'][:8].upper()} — {t['title']}", expanded=not t.get("rating")):
-                    if t.get("rating"):
-                        stars = "⭐" * int(t["rating"])
-                        st.markdown(f"""<div class="success-box">
-                          Feedback submitted: {stars} ({t['rating']}/5)<br>
-                          <em>{t.get('feedback_comment','')}</em>
-                        </div>""", unsafe_allow_html=True)
-                    else:
-                        st.markdown('<div class="warning-box">⏳ Feedback pending — please rate your experience.</div>',
-                                    unsafe_allow_html=True)
-                        rating  = st.slider("Rating", 1, 5, 4, key=f"r_{t['id']}")
-                        comment = st.text_area("Comments", key=f"c_{t['id']}")
-                        if st.button("Submit Feedback", key=f"fb_{t['id']}"):
-                            submit_feedback(t["id"], rating, comment)
-                            st.success("Thank you for your feedback!")
-                            st.rerun()
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ADMIN DASHBOARD
-# ═══════════════════════════════════════════════════════════════════════════════
-def page_admin(user):
-    st.markdown(f"""
-    <div class="main-header">
-      <h1>🛠️ Admin Panel — {user.get('department','Support')}</h1>
-      <p>Support Portal · {user['name']} · {user['email']}</p>
-    </div>""", unsafe_allow_html=True)
-
-    dept = user.get("department")
-    where_clause = "WHERE t.assigned_to_dept=%s" if dept else "WHERE 1=1"
-    params = (dept,) if dept else ()
-
-    tickets = run(f"""
-        SELECT t.*, u.name as reporter_name, u.email as reporter_email
-        FROM tickets t
-        LEFT JOIN users u ON u.id = t.created_by
-        {where_clause} ORDER BY
-          CASE t.priority WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2
-                          WHEN 'MEDIUM' THEN 3 ELSE 4 END,
-          t.created_at DESC
-    """, params)
-
-    # Metrics row
-    all_t  = [dict(t) for t in tickets]
-    open_t = [t for t in all_t if t["status"] == "OPEN"]
-    prog_t = [t for t in all_t if t["status"] == "IN_PROGRESS"]
-    res_t  = [t for t in all_t if t["status"] in ("RESOLVED","CLOSED")]
-
-    c1, c2, c3, c4 = st.columns(4)
-    for col, val, lbl in [
-        (c1, len(all_t),   "Total Tickets"),
-        (c2, len(open_t),  "Open"),
-        (c3, len(prog_t),  "In Progress"),
-        (c4, len(res_t),   "Resolved"),
-    ]:
-        col.markdown(f"""<div class="metric-card">
-          <div class="value">{val}</div>
-          <div class="label">{lbl}</div>
-        </div>""", unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Filters
-    col_f1, col_f2, col_f3 = st.columns(3)
-    search        = col_f1.text_input("🔍 Search", placeholder="Title / category")
-    status_filter = col_f2.multiselect("Status", ["OPEN","ASSIGNED","IN_PROGRESS","RESOLVED","CLOSED"])
-    prio_filter   = col_f3.multiselect("Priority", PRIORITIES)
-
-    filtered = all_t
-    if search:        filtered = [t for t in filtered if search.lower() in t["title"].lower()]
-    if status_filter: filtered = [t for t in filtered if t["status"] in status_filter]
-    if prio_filter:   filtered = [t for t in filtered if t["priority"] in prio_filter]
-
-    if not filtered:
-        st.info("No tickets match the current filters.")
-    else:
-        for t in filtered:
-            ticket_card(t)
-            with st.expander(f"🔧 Manage ticket #{t['id'][:8].upper()}"):
-                col_l, col_r = st.columns(2)
-                with col_l:
-                    st.markdown(f"**Reporter:** {t.get('reporter_name','')} ({t.get('reporter_email','')})")
-                    st.markdown(f"**Current Status:** `{t['status']}`")
-                    st.markdown(f"**Created:** {str(t['created_at'])[:16]}")
-                    st.markdown(f"**Description:**\n{t['description']}")
-                with col_r:
-                    STATUS_FLOW = {
-                        "OPEN":        ["ASSIGNED"],
-                        "ASSIGNED":    ["IN_PROGRESS"],
-                        "IN_PROGRESS": ["RESOLVED"],
-                        "RESOLVED":    ["CLOSED"],
-                        "CLOSED":      [],
-                    }
-                    next_statuses = STATUS_FLOW.get(t["status"], [])
-                    if next_statuses:
-                        new_status = st.selectbox("Move to Status",
-                                                  next_statuses, key=f"ns_{t['id']}")
-                        note = st.text_area("Resolution Note", key=f"note_{t['id']}", height=80)
-                        if st.button("✅ Update Status", key=f"upd_{t['id']}"):
-                            update_ticket_status(t["id"], new_status, note, user["id"])
-                            if new_status == "RESOLVED" and t.get("reporter_email"):
-                                email_feedback_request(t, t["reporter_email"])
-                                st.success("Status updated & feedback email sent to reporter!")
-                            else:
-                                st.success("Status updated!")
-                            st.rerun()
-                    else:
-                        st.markdown('<div class="success-box">✅ Ticket is closed.</div>',
-                                    unsafe_allow_html=True)
-
-                # History
-                history = run("""
-                    SELECT tu.*, u.name as updater
-                    FROM ticket_updates tu
-                    LEFT JOIN users u ON u.id=tu.updated_by
-                    WHERE tu.ticket_id=%s ORDER BY tu.created_at DESC
-                """, (t["id"],))
-                if history:
-                    st.markdown("**Update History:**")
-                    for h in history:
-                        h = dict(h)
-                        st.markdown(f"""
-                        <div style="background:#1a202c;border-left:3px solid #4a5568;
-                             padding:8px 12px;margin:4px 0;border-radius:4px;font-size:0.85rem;">
-                          <span style="color:#63b3ed;">{h.get('updater','?')}</span>
-                          moved to <strong>{h['new_status']}</strong>
-                          · {str(h['created_at'])[:16]}
-                          {f"<br><em style='color:#a0aec0;'>{h['note']}</em>" if h.get('note') else ""}
-                        </div>""", unsafe_allow_html=True)
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MANAGEMENT DASHBOARD
-# ═══════════════════════════════════════════════════════════════════════════════
-def page_management(user):
-    st.markdown(f"""
-    <div class="main-header">
-      <h1>📊 Executive Dashboard</h1>
-      <p>Management Overview · {user['name']} · {user['email']}</p>
-    </div>""", unsafe_allow_html=True)
-
-    tickets = run("""
-        SELECT t.*, u.name as reporter_name, u.department as reporter_dept,
-               f.rating
-        FROM tickets t
-        LEFT JOIN users u ON u.id=t.created_by
-        LEFT JOIN feedback f ON f.ticket_id=t.id
-        ORDER BY t.created_at DESC
-    """)
-
-    if not tickets:
-        st.info("No tickets in the system yet.")
-        return
-
-    df = pd.DataFrame([dict(t) for t in tickets])
-
-    # ── KPI Row ──
-    total    = len(df)
-    open_c   = len(df[df.status=="OPEN"])
-    res_c    = len(df[df.status.isin(["RESOLVED","CLOSED"])])
-    avg_rat  = round(df["rating"].dropna().mean(), 1) if not df["rating"].dropna().empty else "—"
-
-    kpis = [
-        ("Total Tickets",   total,   "#63b3ed"),
-        ("Open",            open_c,  "#fc8181"),
-        ("Resolved",        res_c,   "#68d391"),
-        ("Avg Satisfaction",avg_rat, "#f6ad55"),
-    ]
-    cols = st.columns(4)
-    for col, (lbl, val, color) in zip(cols, kpis):
-        col.markdown(f"""<div class="metric-card">
-          <div class="value" style="color:{color};">{val}</div>
-          <div class="label">{lbl}</div>
-        </div>""", unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── Charts ──
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown('<p class="section-title">Tickets by Department</p>', unsafe_allow_html=True)
-        dept_counts = df.groupby("assigned_to_dept").size().reset_index(name="count")
-        fig1 = px.bar(dept_counts, x="assigned_to_dept", y="count",
-                      color="count", color_continuous_scale="blues",
-                      labels={"assigned_to_dept":"Department","count":"Tickets"})
-        fig1.update_layout(
-            paper_bgcolor="#1a202c", plot_bgcolor="#1a202c",
-            font_color="#a0aec0", showlegend=False,
-            margin=dict(l=20,r=20,t=20,b=20)
-        )
-        fig1.update_xaxes(tickfont_color="#a0aec0")
-        fig1.update_yaxes(tickfont_color="#a0aec0")
-        st.plotly_chart(fig1, use_container_width=True)
-
-    with col2:
-        st.markdown('<p class="section-title">Tickets by Status</p>', unsafe_allow_html=True)
-        status_counts = df.groupby("status").size().reset_index(name="count")
-        colors = {"OPEN":"#63b3ed","ASSIGNED":"#90cdf4","IN_PROGRESS":"#f6ad55",
-                  "RESOLVED":"#68d391","CLOSED":"#718096"}
-        fig2 = px.pie(status_counts, names="status", values="count",
-                      color="status", color_discrete_map=colors, hole=0.5)
-        fig2.update_layout(
-            paper_bgcolor="#1a202c", plot_bgcolor="#1a202c",
-            font_color="#a0aec0", margin=dict(l=20,r=20,t=20,b=20)
-        )
-        st.plotly_chart(fig2, use_container_width=True)
-
-    col3, col4 = st.columns(2)
-
-    with col3:
-        st.markdown('<p class="section-title">Tickets by Priority</p>', unsafe_allow_html=True)
-        prio_counts = df.groupby("priority").size().reset_index(name="count")
-        prio_colors = {"CRITICAL":"#fc8181","HIGH":"#f6ad55","MEDIUM":"#68d391","LOW":"#63b3ed"}
-        fig3 = px.bar(prio_counts, x="priority", y="count",
-                      color="priority", color_discrete_map=prio_colors)
-        fig3.update_layout(
-            paper_bgcolor="#1a202c", plot_bgcolor="#1a202c",
-            font_color="#a0aec0", showlegend=False,
-            margin=dict(l=20,r=20,t=20,b=20)
-        )
-        st.plotly_chart(fig3, use_container_width=True)
-
-    with col4:
-        st.markdown('<p class="section-title">Most Common Categories</p>', unsafe_allow_html=True)
-        cat_counts = df.groupby("category").size().reset_index(name="count").sort_values("count", ascending=True)
-        fig4 = px.bar(cat_counts, x="count", y="category", orientation="h",
-                      color="count", color_continuous_scale="teal")
-        fig4.update_layout(
-            paper_bgcolor="#1a202c", plot_bgcolor="#1a202c",
-            font_color="#a0aec0", showlegend=False,
-            margin=dict(l=20,r=20,t=20,b=20)
-        )
-        st.plotly_chart(fig4, use_container_width=True)
-
-    # ── Avg resolution time ──
-    df["created_at"] = pd.to_datetime(df["created_at"])
-    df["updated_at"] = pd.to_datetime(df["updated_at"])
-    resolved_df = df[df.status.isin(["RESOLVED","CLOSED"])].copy()
-    if not resolved_df.empty:
-        resolved_df["hours_to_resolve"] = (
-            resolved_df["updated_at"] - resolved_df["created_at"]
-        ).dt.total_seconds() / 3600
-        avg_by_dept = resolved_df.groupby("assigned_to_dept")["hours_to_resolve"].mean().reset_index()
-        avg_by_dept.columns = ["Department","Avg Hours to Resolve"]
-        st.markdown('<p class="section-title">Avg Resolution Time by Department (hours)</p>',
-                    unsafe_allow_html=True)
-        fig5 = px.bar(avg_by_dept, x="Department", y="Avg Hours to Resolve",
-                      color="Avg Hours to Resolve", color_continuous_scale="reds")
-        fig5.update_layout(
-            paper_bgcolor="#1a202c", plot_bgcolor="#1a202c",
-            font_color="#a0aec0", showlegend=False,
-            margin=dict(l=20,r=20,t=20,b=20)
-        )
-        st.plotly_chart(fig5, use_container_width=True)
-
-    # ── All Tickets Table ──
-    st.markdown('<p class="section-title">All Tickets</p>', unsafe_allow_html=True)
-    display_df = df[["id","title","category","priority","status",
-                      "assigned_to_dept","reporter_name","created_at"]].copy()
-    display_df["id"] = display_df["id"].str[:8].str.upper()
-    display_df["created_at"] = display_df["created_at"].dt.strftime("%Y-%m-%d %H:%M")
-    display_df.columns = ["ID","Title","Category","Priority","Status",
-                          "Department","Reporter","Created"]
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SIDEBAR
-# ═══════════════════════════════════════════════════════════════════════════════
-def sidebar(user):
+def render_sidebar():
     with st.sidebar:
-        st.markdown("""
-        <div style="text-align:center;padding:1rem 0;">
-          <div style="font-size:2.5rem;">💊</div>
-          <div style="color:#63b3ed;font-size:1.1rem;font-weight:700;">MorepenPDR</div>
-          <div style="color:#718096;font-size:0.75rem;">Issue Management System</div>
-        </div>
-        <hr style="border-color:#2d3748;margin:0.5rem 0 1rem;">
-        """, unsafe_allow_html=True)
+        RC={"scientist":"#58a6ff","admin":"#f0a500","management":"#3fb950"}
+        RI={"scientist":"🧪","admin":"🛠️","management":"📊"}
+        color=RC.get(st.session_state.role,"#58a6ff"); icon=RI.get(st.session_state.role,"👤")
+        st.markdown(f"""<div style="padding:1.5rem 1rem 1rem 1rem;border-bottom:1px solid #21262d;">
+<div style="font-size:1.3rem;font-weight:700;color:#58a6ff;">🔬 MPDR Tracker</div>
+<div style="margin-top:1rem;display:flex;align-items:center;gap:10px;">
+<div style="width:38px;height:38px;background:{color}22;border:2px solid {color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;">{icon}</div>
+<div><div style="font-size:0.82rem;color:#e6edf3;font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{st.session_state.email.split('@')[0]}</div>
+<div style="font-size:0.72rem;color:{color};text-transform:uppercase;font-weight:600;">{st.session_state.role}{' · '+st.session_state.dept if st.session_state.dept else ''}</div>
+</div></div></div>
+<div style="padding:1rem 0.5rem 0.5rem 0.5rem;"><p style="color:#6e7681;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;padding:0 0.5rem;margin-bottom:0.5rem;">Navigation</p></div>""",unsafe_allow_html=True)
 
-        role_icons = {"scientist":"🔬","admin":"🛠️","management":"📊"}
-        st.markdown(f"""
-        <div style="background:#1a202c;border:1px solid #2d3748;border-radius:10px;
-             padding:1rem;margin-bottom:1.5rem;">
-          <div style="color:#63b3ed;font-size:1.5rem;text-align:center;">
-            {role_icons.get(user['role'],'👤')}
-          </div>
-          <div style="color:#e2e8f0;font-weight:600;text-align:center;margin-top:4px;">
-            {user['name']}
-          </div>
-          <div style="color:#718096;font-size:0.8rem;text-align:center;">{user['email']}</div>
-          <div style="text-align:center;margin-top:8px;">
-            <span style="background:#2c5282;color:#bee3f8;padding:2px 10px;
-              border-radius:20px;font-size:0.75rem;font-weight:600;">
-              {user['role'].upper()}
-            </span>
-          </div>
-        </div>""", unsafe_allow_html=True)
+        role=st.session_state.role
+        if role=="scientist":
+            if st.button("➕   New Ticket",use_container_width=True): st.session_state.page="create"
+            if st.button("📋   My Tickets",use_container_width=True): st.session_state.page="my_tickets"
+        elif role=="admin":
+            if st.button("🛠️   Open Tickets",use_container_width=True): st.session_state.page="dept_tickets"
+            if st.button("✅   Resolved",use_container_width=True): st.session_state.page="resolved"
+        elif role=="management":
+            if st.button("📊   Dashboard",use_container_width=True): st.session_state.page="dashboard"
+            if st.button("📋   All Tickets",use_container_width=True): st.session_state.page="all_tickets"
 
-        if st.button("🚪 Sign Out", use_container_width=True):
-            del st.session_state["token"]
+        st.markdown("<hr style='border-color:#21262d;margin:1rem 0;'>",unsafe_allow_html=True)
+        if st.button("🚪   Logout",use_container_width=True):
+            for k in ["logged_in","email","role","dept","page"]: del st.session_state[k]
             st.rerun()
+        st.markdown('<div style="position:fixed;bottom:1rem;left:0;width:260px;text-align:center;"><p style="color:#6e7681;font-size:0.72rem;">MPDR Issue Tracker v1.0<br>Morepen Laboratories</p></div>',unsafe_allow_html=True)
 
-        st.markdown("<hr>", unsafe_allow_html=True)
-        st.markdown("""
-        <div style="color:#4a5568;font-size:0.75rem;text-align:center;margin-top:1rem;">
-          MorepenPDR IMS v1.0<br>
-          Internal use only
-        </div>""", unsafe_allow_html=True)
+def page_create():
+    st.markdown('<div class="page-header"><div class="page-title">➕ Report New Issue</div><div class="page-sub">Submit a ticket to the appropriate department for resolution</div></div>',unsafe_allow_html=True)
+    c1,c2=st.columns([2,1])
+    with c1:
+        with st.form("new_t",clear_on_submit=True):
+            title=st.text_input("Issue Title *",placeholder="e.g. HPLC system not responding in Lab 3")
+            desc =st.text_area("Detailed Description *",placeholder="Describe the issue clearly...",height=140)
+            a,b,c=st.columns(3)
+            with a: cat =st.selectbox("Category *",["Equipment Failure","Software Issue","Safety Concern","Chemical Handling","Facility Problem","Network / IT","Documentation","Other"])
+            with b: prio=st.selectbox("Priority *",["Low","Medium","High","Critical"])
+            with c: dept=st.selectbox("Assign To *",["IT","Lab Maintenance","Safety"])
+            st.markdown("<br>",unsafe_allow_html=True)
+            sub=st.form_submit_button("🚀  Submit Ticket",use_container_width=True)
+        if sub:
+            if not title.strip() or not desc.strip(): st.error("⛔ Title and description are required.")
+            else:
+                with st.spinner("Submitting and notifying..."):
+                    tid=create_ticket(title.strip(),desc.strip(),cat,prio,dept,st.session_state.email)
+                st.success(f"✅ **Ticket submitted!** ID: `#{tid[:8].upper()}` · Notification sent to admin@morepenpdr.com")
+    with c2:
+        st.markdown("""<div class="info-card"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">📌 Priority Guide</p>
+<div style="margin-bottom:8px;"><span class="badge b-critical">Critical</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Safety risk / production stopped</span></div>
+<div style="margin-bottom:8px;"><span class="badge b-high">High</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Major impact on work</span></div>
+<div style="margin-bottom:8px;"><span class="badge b-medium">Medium</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Moderate disruption</span></div>
+<div><span class="badge b-low">Low</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Minor / non-urgent</span></div></div>
+<div class="info-card" style="margin-top:1rem;"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">🏢 Departments</p>
+<div style="color:#8b949e;font-size:0.85rem;line-height:2;">🖥️ <b style="color:#e6edf3;">IT</b> — Software, network<br>🧪 <b style="color:#e6edf3;">Lab Maintenance</b> — Equipment<br>⚠️ <b style="color:#e6edf3;">Safety</b> — Hazards, compliance</div></div>""",unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# MAIN
-# ═══════════════════════════════════════════════════════════════════════════════
+def page_my_tickets():
+    st.markdown('<div class="page-header"><div class="page-title">📋 My Tickets</div><div class="page-sub">Track all issues you have reported</div></div>',unsafe_allow_html=True)
+    tickets=[t for t in all_tickets() if t["created_by"]==st.session_state.email]
+    if not tickets: st.info("No tickets yet. Click New Ticket to report an issue."); return
+
+    on=sum(1 for t in tickets if t["status"]=="OPEN")
+    rn=sum(1 for t in tickets if t["status"] in ["RESOLVED","CLOSED"])
+    pf=sum(1 for t in tickets if t["status"]=="RESOLVED" and not has_fb(t["ticket_id"]))
+    a,b,c,d=st.columns(4)
+    with a: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#58a6ff;">{len(tickets)}</div><div class="stat-label">Total</div></div>',unsafe_allow_html=True)
+    with b: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff7b72;">{on}</div><div class="stat-label">Open</div></div>',unsafe_allow_html=True)
+    with c: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#3fb950;">{rn}</div><div class="stat-label">Resolved</div></div>',unsafe_allow_html=True)
+    with d: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#f0a500;">{pf}</div><div class="stat-label">Pending Feedback</div></div>',unsafe_allow_html=True)
+
+    st.markdown("<br>",unsafe_allow_html=True)
+    c1,c2=st.columns(2)
+    with c1: sf=st.selectbox("Status",["All","OPEN","ASSIGNED","IN_PROGRESS","RESOLVED","CLOSED"])
+    with c2: pf2=st.selectbox("Priority",["All","Critical","High","Medium","Low"])
+    filtered=list(reversed(tickets))
+    if sf!="All": filtered=[t for t in filtered if t["status"]==sf]
+    if pf2!="All": filtered=[t for t in filtered if t["priority"]==pf2]
+    st.markdown(f"<p style='color:#8b949e;font-size:0.85rem;'>{len(filtered)} ticket(s)</p>",unsafe_allow_html=True)
+
+    for t in filtered:
+        bc=PB.get(t["priority"],"low")
+        rh=f"""<div style="background:#1b3a2d;border:1px solid #238636;border-radius:6px;padding:8px 12px;margin-top:8px;"><span style="color:#3fb950;font-size:0.8rem;font-weight:600;">✅ RESOLUTION: </span><span style="color:#e6edf3;font-size:0.85rem;">{t['resolution_notes']}</span></div>""" if t.get("resolution_notes") else ""
+        st.markdown(f"""<div class="ticket-card {bc}"><div class="ticket-id">#{t['ticket_id'][:8].upper()}</div>
+<div class="ticket-title">{t['title']}</div>
+<div class="ticket-desc">{t['description'][:200]}{'...' if len(t['description'])>200 else ''}</div>
+{rh}<div class="ticket-meta">{sb(t['status'])} &nbsp; {pb(t['priority'])} &nbsp; 🏢 {t['assigned_to']} &nbsp;&nbsp; 📅 {t['created_at']}</div></div>""",unsafe_allow_html=True)
+
+        if t["status"]=="RESOLVED" and not has_fb(t["ticket_id"]):
+            with st.expander(f"⭐ Submit Feedback — #{t['ticket_id'][:8].upper()}"):
+                st.markdown('<p style="color:#f0a500;font-weight:600;">Your ticket is resolved! Please rate the support.</p>',unsafe_allow_html=True)
+                rating=st.slider("Rating",1,5,4,key=f"r_{t['ticket_id']}",help="1=Poor · 5=Excellent")
+                st.markdown(f"<div style='font-size:1.5rem;'>{st_stars(rating)}</div>",unsafe_allow_html=True)
+                comments=st.text_area("Comments (optional)",key=f"c_{t['ticket_id']}")
+                if st.button("Submit Feedback ✓",key=f"fb_{t['ticket_id']}"):
+                    submit_fb(t["ticket_id"],st.session_state.email,rating,comments)
+                    st.success("✅ Thank you! Ticket is now closed."); st.rerun()
+        elif t["status"]=="CLOSED":
+            fb=next((f for f in all_feedback() if f["ticket_id"]==t["ticket_id"]),None)
+            if fb:
+                st.markdown(f"""<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px 12px;margin-top:-8px;margin-bottom:8px;"><span style="color:#8b949e;font-size:0.8rem;">Your feedback: </span><span style="font-size:1rem;">{st_stars(fb['rating'])}</span>{f'<span style="color:#8b949e;font-size:0.82rem;"> · {fb["comments"]}</span>' if fb.get("comments") else ""}</div>""",unsafe_allow_html=True)
+
+def page_dept():
+    dept=st.session_state.dept
+    st.markdown(f'<div class="page-header"><div class="page-title">🛠️ {dept} — Open Tickets</div><div class="page-sub">Manage and resolve tickets assigned to your department</div></div>',unsafe_allow_html=True)
+    tickets=[t for t in all_tickets() if t["assigned_to"]==dept and t["status"] not in ["RESOLVED","CLOSED"]]
+    if not tickets: st.success("🎉 No open tickets right now!"); return
+
+    cn=sum(1 for t in tickets if t["priority"]=="Critical"); hn=sum(1 for t in tickets if t["priority"]=="High")
+    a,b,c=st.columns(3)
+    with a: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff7b72;">{len(tickets)}</div><div class="stat-label">Open</div></div>',unsafe_allow_html=True)
+    with b: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff4444;">{cn}</div><div class="stat-label">Critical</div></div>',unsafe_allow_html=True)
+    with c: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff7b72;">{hn}</div><div class="stat-label">High</div></div>',unsafe_allow_html=True)
+
+    st.markdown("<br>",unsafe_allow_html=True)
+    po={"Critical":0,"High":1,"Medium":2,"Low":3}
+    tickets=sorted(tickets,key=lambda x:po.get(x["priority"],4))
+    pf=st.selectbox("Filter by Priority",["All","Critical","High","Medium","Low"])
+    if pf!="All": tickets=[t for t in tickets if t["priority"]==pf]
+
+    for t in tickets:
+        with st.expander(f"#{t['ticket_id'][:8].upper()} · {t['title']}  |  {t['priority']}  |  {t['status']}"):
+            c1,c2=st.columns(2)
+            with c1:
+                st.markdown(f"""<div class="info-card"><p style="color:#8b949e;font-size:0.78rem;margin:0 0 10px 0;">TICKET DETAILS</p>
+<p style="margin:4px 0;"><b>Reported by:</b> {t['created_by']}</p>
+<p style="margin:4px 0;"><b>Category:</b> {t['category']}</p>
+<p style="margin:4px 0;"><b>Priority:</b> {pb(t['priority'])}</p>
+<p style="margin:4px 0;"><b>Status:</b> {sb(t['status'])}</p>
+<p style="margin:4px 0;"><b>Created:</b> {t['created_at']}</p></div>""",unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""<div class="info-card"><p style="color:#8b949e;font-size:0.78rem;margin:0 0 10px 0;">DESCRIPTION</p>
+<p style="color:#e6edf3;line-height:1.6;font-size:0.9rem;">{t['description']}</p></div>""",unsafe_allow_html=True)
+
+            st.markdown("**Update Ticket**")
+            u1,u2=st.columns(2)
+            with u1:
+                opts=["OPEN","ASSIGNED","IN_PROGRESS","RESOLVED"]
+                idx=opts.index(t["status"]) if t["status"] in opts else 0
+                ns=st.selectbox("New Status",opts,index=idx,key=f"st_{t['ticket_id']}")
+            with u2:
+                notes=st.text_input("Resolution Notes",value=t.get("resolution_notes",""),placeholder="How was the issue fixed?",key=f"nt_{t['ticket_id']}")
+
+            if ns=="RESOLVED": st.warning("⚠️ This will send a feedback email to the reporter.")
+            if st.button(f"✅ Update #{t['ticket_id'][:8].upper()}",key=f"upd_{t['ticket_id']}"):
+                if ns=="RESOLVED" and not notes.strip(): st.error("Add resolution notes before marking resolved.")
+                else:
+                    with st.spinner("Updating..."):
+                        update_ticket(t["ticket_id"],ns,notes)
+                    st.success("✅ Resolved! Feedback email sent." if ns=="RESOLVED" else f"✅ Updated to {ns}.")
+                    st.rerun()
+
+def page_resolved():
+    dept=st.session_state.dept
+    st.markdown(f'<div class="page-header"><div class="page-title">✅ Resolved — {dept}</div><div class="page-sub">Tickets your department has resolved</div></div>',unsafe_allow_html=True)
+    tickets=[t for t in all_tickets() if t["assigned_to"]==dept and t["status"] in ["RESOLVED","CLOSED"]]
+    if not tickets: st.info("No resolved tickets yet."); return
+    fbs={f["ticket_id"]:f for f in all_feedback()}
+    for t in reversed(tickets):
+        fb=fbs.get(t["ticket_id"])
+        st.markdown(f"""<div class="ticket-card low"><div class="ticket-id">#{t['ticket_id'][:8].upper()}</div>
+<div class="ticket-title">{t['title']}</div>
+<div class="ticket-meta">{sb(t['status'])} &nbsp; {pb(t['priority'])} &nbsp; 👤 {t['created_by']} &nbsp;&nbsp; 📅 {t['updated_at']}</div>
+{f'<div style="margin-top:8px;color:#3fb950;font-size:0.85rem;">✅ {t["resolution_notes"]}</div>' if t.get("resolution_notes") else ""}
+{f'<div style="margin-top:6px;color:#f0a500;font-size:0.85rem;">⭐ {st_stars(fb["rating"])} · {fb.get("comments","")}</div>' if fb else '<div style="margin-top:6px;color:#8b949e;font-size:0.82rem;">⏳ Awaiting feedback</div>'}
+</div>""",unsafe_allow_html=True)
+
+def page_dashboard():
+    st.markdown('<div class="page-header"><div class="page-title">📊 Executive Dashboard</div><div class="page-sub">Real-time overview of all issues · Morepen Laboratories</div></div>',unsafe_allow_html=True)
+    tickets=all_tickets()
+    if not tickets: st.info("No data yet."); return
+    df=pd.DataFrame(tickets)
+    tot=len(df); on=len(df[df["status"]=="OPEN"]); ip=len(df[df["status"]=="IN_PROGRESS"])
+    rn=len(df[df["status"].isin(["RESOLVED","CLOSED"])]); cr=len(df[df["priority"]=="Critical"])
+    a,b,c,d,e=st.columns(5)
+    with a: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#58a6ff;">{tot}</div><div class="stat-label">Total</div></div>',unsafe_allow_html=True)
+    with b: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff7b72;">{on}</div><div class="stat-label">Open</div></div>',unsafe_allow_html=True)
+    with c: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#f0a500;">{ip}</div><div class="stat-label">In Progress</div></div>',unsafe_allow_html=True)
+    with d: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#3fb950;">{rn}</div><div class="stat-label">Resolved</div></div>',unsafe_allow_html=True)
+    with e: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff4444;">{cr}</div><div class="stat-label">Critical</div></div>',unsafe_allow_html=True)
+    st.markdown("<br>",unsafe_allow_html=True)
+    BG="#161b22"; FC="#e6edf3"; GC="#21262d"
+    def sty(fig):
+        fig.update_layout(paper_bgcolor=BG,plot_bgcolor=BG,font_color=FC,title_font_color="#58a6ff",title_font_size=14,margin=dict(t=40,b=20,l=20,r=20),legend=dict(bgcolor=BG,bordercolor=GC))
+        fig.update_xaxes(gridcolor=GC,zerolinecolor=GC); fig.update_yaxes(gridcolor=GC,zerolinecolor=GC); return fig
+    c1,c2=st.columns(2)
+    with c1:
+        sc=df["status"].value_counts().reset_index(); sc.columns=["Status","Count"]
+        cm={"OPEN":"#58a6ff","ASSIGNED":"#f0a500","IN_PROGRESS":"#3fb950","RESOLVED":"#56d364","CLOSED":"#8b949e"}
+        fig=px.pie(sc,values="Count",names="Status",title="Tickets by Status",color="Status",color_discrete_map=cm,hole=0.45)
+        fig.update_traces(textfont_color=FC); st.plotly_chart(sty(fig),use_container_width=True)
+    with c2:
+        dc=df["assigned_to"].value_counts().reset_index(); dc.columns=["Department","Count"]
+        fig2=px.bar(dc,x="Department",y="Count",title="Tickets by Department",color="Count",color_continuous_scale=["#1f6feb","#58a6ff","#79c0ff"])
+        st.plotly_chart(sty(fig2),use_container_width=True)
+    c1,c2=st.columns(2)
+    with c1:
+        cc=df["category"].value_counts().reset_index(); cc.columns=["Category","Count"]
+        fig3=px.bar(cc,x="Count",y="Category",orientation="h",title="Top Issue Categories",color="Count",color_continuous_scale=["#238636","#3fb950","#56d364"])
+        st.plotly_chart(sty(fig3),use_container_width=True)
+    with c2:
+        pc=df["priority"].value_counts().reset_index(); pc.columns=["Priority","Count"]
+        pcm={"Low":"#3fb950","Medium":"#f0a500","High":"#ff7b72","Critical":"#ff4444"}
+        fig4=px.bar(pc,x="Priority",y="Count",title="Tickets by Priority",color="Priority",color_discrete_map=pcm)
+        st.plotly_chart(sty(fig4),use_container_width=True)
+    fbs=all_feedback()
+    if fbs:
+        fb_df=pd.DataFrame(fbs); avg=fb_df["rating"].astype(float).mean()
+        st.markdown(f"""<div class="info-card" style="text-align:center;margin-top:1rem;">
+<p style="color:#8b949e;font-size:0.82rem;margin:0 0 6px 0;">AVERAGE SATISFACTION SCORE</p>
+<div style="font-size:2.5rem;font-weight:700;color:#f0a500;">{avg:.1f} / 5.0</div>
+<div style="font-size:1.8rem;">{st_stars(round(avg))}</div>
+<div style="color:#8b949e;font-size:0.85rem;margin-top:0.3rem;">Based on {len(fbs)} feedback response(s)</div></div>""",unsafe_allow_html=True)
+
+def page_all_tickets():
+    st.markdown('<div class="page-header"><div class="page-title">📋 All Tickets</div><div class="page-sub">Complete view of every ticket in the system</div></div>',unsafe_allow_html=True)
+    tickets=all_tickets()
+    if not tickets: st.info("No tickets yet."); return
+    c1,c2,c3,c4=st.columns(4)
+    with c1: sf=st.selectbox("Status",["All","OPEN","ASSIGNED","IN_PROGRESS","RESOLVED","CLOSED"])
+    with c2: pf=st.selectbox("Priority",["All","Critical","High","Medium","Low"])
+    with c3: df2=st.selectbox("Department",["All","IT","Lab Maintenance","Safety"])
+    with c4: srch=st.text_input("🔍 Search",placeholder="Title or reporter...")
+    filtered=tickets
+    if sf!="All": filtered=[t for t in filtered if t["status"]==sf]
+    if pf!="All": filtered=[t for t in filtered if t["priority"]==pf]
+    if df2!="All": filtered=[t for t in filtered if t["assigned_to"]==df2]
+    if srch:
+        s=srch.lower(); filtered=[t for t in filtered if s in t["title"].lower() or s in t["created_by"].lower()]
+    st.markdown(f"<p style='color:#8b949e;font-size:0.85rem;'>{len(filtered)} ticket(s)</p>",unsafe_allow_html=True)
+    if filtered:
+        disp=pd.DataFrame(filtered)[["ticket_id","title","category","priority","status","assigned_to","created_by","created_at"]].copy()
+        disp["ticket_id"]=disp["ticket_id"].str[:8].str.upper()
+        disp.columns=["ID","Title","Category","Priority","Status","Department","Reporter","Created"]
+        st.dataframe(disp,use_container_width=True,hide_index=True)
+
 def main():
-    user = get_current_user()
+    if not st.session_state.logged_in:
+        login_page(); return
+    render_sidebar()
+    role=st.session_state.role; page=st.session_state.page
+    if role=="scientist":
+        if page in ("home","create","login"): page_create()
+        elif page=="my_tickets":             page_my_tickets()
+        else:                                page_create()
+    elif role=="admin":
+        if page in ("home","dept_tickets","login"): page_dept()
+        elif page=="resolved":                      page_resolved()
+        else:                                       page_dept()
+    elif role=="management":
+        if page in ("home","dashboard","login"): page_dashboard()
+        elif page=="all_tickets":                page_all_tickets()
+        else:                                    page_dashboard()
 
-    if not user:
-        page_login()
-        return
-
-    sidebar(user)
-
-    role = user.get("role", "scientist")
-    if role == "scientist":
-        page_scientist(user)
-    elif role == "admin":
-        page_admin(user)
-    elif role == "management":
-        page_management(user)
-    else:
-        st.error("Unknown role. Please contact administrator.")
-
-if __name__ == "__main__":
+if __name__=="__main__":
     main()
