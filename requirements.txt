@@ -1,6 +1,6 @@
-streamlit==1.32.0
-psycopg2-binary==2.9.9
-bcrypt==4.1.2
-PyJWT==2.8.0
-pandas==2.2.1
-plotly==5.20.0
+streamlit
+gspread
+google-auth
+bcrypt
+plotly
+pandas
