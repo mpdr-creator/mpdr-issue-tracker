@@ -86,6 +86,67 @@ h1,h2,h3,h4 { color:#0d2d5e !important; }
 [data-testid="collapsedControl"] { display:none !important; }
 [data-testid="stIconMaterial"] { display:none !important; }
 button[data-testid="baseButton-headerNoPadding"] span { visibility:hidden !important; font-size:0 !important; }
+
+/* ── Dark-mode proofing: force light palette on every Streamlit surface ── */
+.stApp, .main, [data-testid="stAppViewContainer"],
+[data-testid="stMain"], [data-testid="stMainBlockContainer"],
+[data-testid="stVerticalBlock"], [data-testid="stHorizontalBlock"],
+.element-container, .stMarkdown, .block-container
+{ background-color:#f0f6ff !important; color:#0d2d5e !important; }
+
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] li,
+[data-testid="stMarkdownContainer"] span
+{ color:#0d2d5e !important; }
+
+/* Widget labels */
+label, [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p,
+.stTextInput label, .stTextArea label, .stSelectbox label,
+.stMultiSelect label, .stSlider label, .stNumberInput label,
+.stRadio label, .stCheckbox label
+{ color:#0d2d5e !important; }
+
+/* Extra input backgrounds */
+.stNumberInput input, .stDateInput input, .stTimeInput input
+{ background:#ffffff !important; color:#0d2d5e !important; border:1.5px solid #90c6ff !important; }
+
+/* Select / multi-select */
+.stSelectbox [data-baseweb="select"] > div,
+.stMultiSelect [data-baseweb="select"] > div
+{ background:#ffffff !important; color:#0d2d5e !important; }
+
+/* Dropdown option list */
+[data-baseweb="popover"] [role="option"],
+[data-baseweb="menu"] [role="option"]
+{ background:#ffffff !important; color:#0d2d5e !important; }
+[data-baseweb="popover"] [role="option"]:hover,
+[data-baseweb="menu"] [role="option"]:hover
+{ background:#e8f4ff !important; }
+
+/* Checkbox / radio labels */
+.stCheckbox span, .stRadio span { color:#0d2d5e !important; }
+
+/* Native alert banners */
+[data-testid="stAlert"] { color:#0d2d5e !important; }
+[data-testid="stAlert"] p { color:inherit !important; }
+
+/* Dataframe */
+[data-testid="stDataFrame"], .stDataFrame iframe, .dvn-scroller
+{ background:#ffffff !important; color:#0d2d5e !important; }
+
+/* Metric widget */
+[data-testid="stMetricLabel"] p,
+[data-testid="stMetricValue"], [data-testid="stMetricDelta"]
+{ color:#0d2d5e !important; }
+
+/* Expander header/content */
+details > summary, [data-testid="stExpander"] summary
+{ background:#e8f4ff !important; color:#0d2d5e !important; }
+[data-testid="stExpander"] details { background:#f8fbff !important; }
+
+/* Caption / small text */
+.stCaption, small, caption { color:#4a7ab5 !important; }
+[data-testid="stSpinner"] p  { color:#0d2d5e !important; }
 </style>
 """, unsafe_allow_html=True)
 
