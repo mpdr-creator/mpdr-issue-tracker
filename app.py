@@ -147,6 +147,108 @@ details > summary, [data-testid="stExpander"] summary
 /* Caption / small text */
 .stCaption, small, caption { color:#4a7ab5 !important; }
 [data-testid="stSpinner"] p  { color:#0d2d5e !important; }
+
+/* ── COMPREHENSIVE DARK-MODE OVERRIDE (v2) ── */
+
+/* Force ALL text nodes to dark-on-light */
+body, body * { color:#0d2d5e; }
+
+/* Streamlit heading helpers */
+[data-testid="stHeadingWithActionElements"],
+[data-testid="stHeadingWithActionElements"] *,
+[data-testid="stText"], [data-testid="stText"] *,
+[data-testid="stSubheader"], [data-testid="stSubheader"] *,
+[data-testid="stHeader"], [data-testid="stHeader"] *,
+[data-testid="stTitle"], [data-testid="stTitle"] *
+{ color:#0d2d5e !important; background-color:transparent !important; }
+
+/* All containers that could go dark */
+[data-testid="stVerticalBlock"] *,
+[data-testid="stHorizontalBlock"] *,
+.stMarkdown *, .block-container *, .element-container *
+{ color:#0d2d5e !important; }
+
+/* Form containers */
+[data-testid="stForm"]
+{ background:#ffffff !important; border:1px solid #c8e3ff !important;
+  border-radius:12px !important; padding:1rem !important; }
+[data-testid="stForm"] * { color:#0d2d5e !important; }
+
+/* Slider */
+.stSlider *, .stSlider [data-testid="stThumbValue"]
+{ color:#0d2d5e !important; }
+
+/* Tab panels */
+[data-baseweb="tab-panel"]
+{ background:#f0f6ff !important; }
+[data-baseweb="tab-panel"] *
+{ color:#0d2d5e !important; }
+
+/* Markdown tables */
+[data-testid="stMarkdownContainer"] table
+{ background:#ffffff !important; color:#0d2d5e !important;
+  border-collapse:collapse !important; }
+[data-testid="stMarkdownContainer"] th
+{ background:#e8f4ff !important; color:#0d2d5e !important; }
+[data-testid="stMarkdownContainer"] td
+{ background:#ffffff !important; color:#0d2d5e !important; }
+
+/* Tooltip */
+[data-baseweb="tooltip"] *
+{ background:#0d2d5e !important; color:#ffffff !important; }
+
+/* Code blocks */
+code, pre
+{ background:#e8f4ff !important; color:#0d2d5e !important;
+  border-radius:4px !important; }
+
+/* Selectbox displayed value text */
+.stSelectbox [data-baseweb="select"] span,
+.stSelectbox [data-baseweb="select"] *
+{ color:#0d2d5e !important; }
+
+/* Multiselect tag chips */
+.stMultiSelect [data-baseweb="tag"]
+{ background:#dbeeff !important; color:#0d2d5e !important; }
+
+/* Radio & checkbox inner text */
+.stRadio > label > div, .stCheckbox > label > div,
+.stRadio > div > label, .stCheckbox > div > label
+{ color:#0d2d5e !important; }
+
+/* Info / warning / error / success native Streamlit boxes */
+[data-testid="stAlert"] *
+{ color:#0d2d5e !important; }
+.stInfo *, .stWarning *, .stError *, .stSuccess *
+{ color:#0d2d5e !important; }
+
+/* File uploader */
+[data-testid="stFileUploader"],
+[data-testid="stFileUploader"] *
+{ background:#ffffff !important; color:#0d2d5e !important; }
+
+/* Download button */
+[data-testid="stDownloadButton"] button
+{ background:#0d2d5e !important; color:#ffffff !important; }
+
+/* Number input spinners */
+.stNumberInput button
+{ background:#e8f4ff !important; color:#0d2d5e !important;
+  border:1px solid #90c6ff !important; }
+
+/* Date / time picker dialogs */
+[data-baseweb="calendar"], [data-baseweb="datepicker"],
+[data-baseweb="timepicker"]
+{ background:#ffffff !important; color:#0d2d5e !important; }
+[data-baseweb="calendar"] *,
+[data-baseweb="datepicker"] *
+{ color:#0d2d5e !important; }
+
+/* Sidebar text (ensure white on dark sidebar) */
+section[data-testid="stSidebar"] *
+{ color:#ffffff !important; }
+section[data-testid="stSidebar"] .stMarkdown *
+{ color:#ffffff !important; }
 </style>
 """, unsafe_allow_html=True)
 
