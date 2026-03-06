@@ -66,7 +66,7 @@ section[data-testid="stSidebar"] .stButton button:hover { background:rgba(56,182
 .stTabs [data-baseweb="tab"] { background:transparent !important; color:#4a7ab5 !important; border-radius:7px !important; padding:0.5rem 1.2rem !important; font-weight:500 !important; }
 .stTabs [aria-selected="true"] { background:#0d2d5e !important; color:#ffffff !important; }
 
-.streamlit-expanderHeader { background:#e8f4ff !important; border:1px solid #b3d9ff !important; border-radius:8px !important; color:#0d2d5e !important; font-weight:600 !important; }
+.streamlit-expanderHeader { background:#e8f4ff !important; border:1px solid #b3d9ff !important; border-radius:8px !important; color:#0d2d5e !important; font-weight:600 !important; padding-right:2.5rem !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; }
 .streamlit-expanderContent { background:#f8fbff !important; border:1px solid #b3d9ff !important; border-top:none !important; }
 
 .stDataFrame { border:1px solid #b3d9ff !important; border-radius:10px !important; }
@@ -81,6 +81,11 @@ h1,h2,h3,h4 { color:#0d2d5e !important; }
 ::-webkit-scrollbar-thumb { background:#38b6ff; border-radius:3px; }
 ::-webkit-scrollbar-thumb:hover { background:#0d2d5e; }
 .sidebar-user { background:rgba(255,255,255,0.12); border:1px solid rgba(56,182,255,0.3); border-radius:10px; padding:0.9rem 1rem; margin-bottom:1rem; }
+/* hide raw Material-icons text on sidebar collapse/expand button */
+button[kind="header"] { font-size:0 !important; }
+button[kind="header"] * { font-size:0 !important; }
+[data-testid="collapsedControl"] { font-size:0 !important; }
+[data-testid="collapsedControl"] * { font-size:0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
