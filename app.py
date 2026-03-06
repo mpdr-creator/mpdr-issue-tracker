@@ -109,6 +109,9 @@ DEPT_EMAILS = {
     "Safety":          "admin@morepenpdr.com",
 }
 
+# SLA resolution deadlines (hours) per priority
+SLA_HOURS = {"Critical": 4, "High": 24, "Medium": 72, "Low": 168}
+
 def send_email(to_list, subject, html_body):
     try:
         user = st.secrets["gmail"]["user"]
