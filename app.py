@@ -214,6 +214,40 @@ def submit_fb(tid,by,rating,comments):
     sheet("feedback").append_row([tid,by,rating,comments,datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
     update_ticket(tid,"CLOSED")
 
+def get_sla_info(ticket):
+    """Return dict: elapsed_h, remaining_h, pct, status for a ticket."""
+    if ticket.get("status") in ("RESOLVED","CLOSED"):
+        return {"status":"N/A","elapsed":0,"remaining":0,"pct":0}
+    allowed=SLA_HOURS.get(ticket.get("priority"),72)
+    try:
+        created=datetime.strptime(ticket["created_at"],"%Y-%m-%d %H:%M:%S")
+        elapsed=(datetime.now()-created).total_seconds()/3600
+    except Exception:
+        return {"status":"N/A","elapsed":0,"remaining":0,"pct":0}
+    pct=min(elapsed/allowed*100,100)
+    remaining=max(allowed-elapsed,0)
+    if elapsed>=allowed:
+        sla_status="Breached"
+    elif pct>=75:
+        sla_status="At Risk"
+    else:
+        sla_status="On Track"
+    return {"status":sla_status,"elapsed":elapsed,"remaining":remaining,"pct":pct}
+
+def sla_badge(info):
+    """Return colour-coded HTML badge string."""
+    s=info["status"]
+    if s=="N/A": return '<span style="color:#8b949e;font-size:0.78rem;">⬜ N/A</span>'
+    rem=info["remaining"]
+    h=int(rem); m=int((rem-h)*60)
+    time_str=f"{h}h {m}m left" if s!="Breached" else "SLA Breached"
+    colour={"On Track":"#3fb950","At Risk":"#f0a500","Breached":"#ff4444"}.get(s,"#8b949e")
+    icon={"On Track":"🟢","At Risk":"🟡","Breached":"🔴"}.get(s,"⬜")
+    return (f'<span style="background:{colour}22;border:1px solid {colour};border-radius:12px;'
+            f'padding:2px 8px;font-size:0.75rem;font-weight:600;color:{colour};">'
+            f'{icon} {s} &middot; {time_str}</span>')
+
+
 SC={"OPEN":"b-open","ASSIGNED":"b-assigned","IN_PROGRESS":"b-inprog","RESOLVED":"b-resolved","CLOSED":"b-closed"}
 PC={"Low":"b-low","Medium":"b-medium","High":"b-high","Critical":"b-critical"}
 PB={"Low":"low","Medium":"medium","High":"high","Critical":"critical"}
@@ -356,7 +390,7 @@ def page_my_tickets():
         st.markdown(f"""<div class="ticket-card {bc}"><div class="ticket-id">#{t['ticket_id'][:8].upper()}</div>
 <div class="ticket-title">{t['title']}</div>
 <div class="ticket-desc">{t['description'][:200]}{'...' if len(t['description'])>200 else ''}</div>
-{rh}<div class="ticket-meta">{sb(t['status'])} &nbsp; {pb(t['priority'])} &nbsp; 🏢 {t['assigned_to']} &nbsp;&nbsp; 📅 {t['created_at']}</div></div>""",unsafe_allow_html=True)
+{rh}<div class="ticket-meta">{sb(t['status'])} &nbsp; {pb(t['priority'])} &nbsp; 🏢 {t['assigned_to']} &nbsp;&nbsp; 📅 {t['created_at']} &nbsp;&nbsp; {sla_badge(get_sla_info(t))}</div></div>""",unsafe_allow_html=True)
 
         if t["status"]=="RESOLVED" and not has_fb(t["ticket_id"]):
             with st.expander(f"⭐ Submit Feedback — #{t['ticket_id'][:8].upper()}"):
@@ -394,12 +428,17 @@ def page_dept():
         with st.expander(f"#{t['ticket_id'][:8].upper()} · {t['title']}  |  {t['priority']}  |  {t['status']}"):
             c1,c2=st.columns(2)
             with c1:
+                _sla=get_sla_info(t)
+                _bar_w=int(_sla['pct'])
+                _bar_col={"On Track":"#3fb950","At Risk":"#f0a500","Breached":"#ff4444","N/A":"#8b949e"}.get(_sla['status'],"#8b949e")
+                _sla_bar=f'<div style="background:#30363d;border-radius:4px;height:6px;margin-top:4px;"><div style="width:{_bar_w}%;background:{_bar_col};height:6px;border-radius:4px;"></div></div>' if _sla['status']!="N/A" else ""
                 st.markdown(f"""<div class="info-card"><p style="color:#8b949e;font-size:0.78rem;margin:0 0 10px 0;">TICKET DETAILS</p>
 <p style="margin:4px 0;"><b>Reported by:</b> {t['created_by']}</p>
 <p style="margin:4px 0;"><b>Category:</b> {t['category']}</p>
 <p style="margin:4px 0;"><b>Priority:</b> {pb(t['priority'])}</p>
 <p style="margin:4px 0;"><b>Status:</b> {sb(t['status'])}</p>
-<p style="margin:4px 0;"><b>Created:</b> {t['created_at']}</p></div>""",unsafe_allow_html=True)
+<p style="margin:4px 0;"><b>Created:</b> {t['created_at']}</p>
+<p style="margin:4px 0;"><b>SLA:</b> {sla_badge(_sla)}</p>{_sla_bar}</div>""",unsafe_allow_html=True)
             with c2:
                 st.markdown(f"""<div class="info-card"><p style="color:#8b949e;font-size:0.78rem;margin:0 0 10px 0;">DESCRIPTION</p>
 <p style="color:#e6edf3;line-height:1.6;font-size:0.9rem;">{t['description']}</p></div>""",unsafe_allow_html=True)
@@ -483,6 +522,22 @@ def page_dashboard():
 <div style="font-size:2.5rem;font-weight:700;color:#f0a500;">{avg:.1f} / 5.0</div>
 <div style="font-size:1.8rem;">{st_stars(round(avg))}</div>
 <div style="color:#8b949e;font-size:0.85rem;margin-top:0.3rem;">Based on {len(fbs)} feedback response(s)</div></div>""",unsafe_allow_html=True)
+    all_t=all_tickets()
+    closed_t=[t for t in all_t if t.get("status") in ("RESOLVED","CLOSED")]
+    breached=[t for t in all_t if get_sla_info(t)["status"]=="Breached"]
+    at_risk=[t for t in all_t if get_sla_info(t)["status"]=="At Risk"]
+    if closed_t:
+        on_time=[t for t in closed_t if get_sla_info(t)["status"]=="N/A"]
+        compliance=len(on_time)/len(closed_t)*100
+    else:
+        compliance=100.0
+    st.markdown(f"""<div class="info-card" style="text-align:center;margin-top:1rem;">
+<p style="color:#8b949e;font-size:0.82rem;margin:0 0 6px 0;">SLA COMPLIANCE</p>
+<div style="display:flex;justify-content:space-around;flex-wrap:wrap;gap:0.5rem;">
+<div><div style="font-size:1.8rem;font-weight:700;color:#ff4444;">{len(breached)}</div><div style="color:#8b949e;font-size:0.78rem;">Breached</div></div>
+<div><div style="font-size:1.8rem;font-weight:700;color:#f0a500;">{len(at_risk)}</div><div style="color:#8b949e;font-size:0.78rem;">At Risk</div></div>
+<div><div style="font-size:1.8rem;font-weight:700;color:#3fb950;">{compliance:.0f}%</div><div style="color:#8b949e;font-size:0.78rem;">Compliance</div></div>
+</div></div>""",unsafe_allow_html=True)
 
 def page_all_tickets():
     st.markdown('<div class="page-header"><div class="page-title">📋 All Tickets</div><div class="page-sub">Complete view of every ticket in the system</div></div>',unsafe_allow_html=True)
@@ -491,7 +546,7 @@ def page_all_tickets():
     c1,c2,c3,c4=st.columns(4)
     with c1: sf=st.selectbox("Status",["All","OPEN","ASSIGNED","IN_PROGRESS","RESOLVED","CLOSED"])
     with c2: pf=st.selectbox("Priority",["All","Critical","High","Medium","Low"])
-    with c3: df2=st.selectbox("Department",["All","IT","Lab Maintenance","Safety"])
+    with c3: df2=st.selectbox("Department",["All","IT","Lab Maintenance","HR","Safety"])
     with c4: srch=st.text_input("🔍 Search",placeholder="Title or reporter...")
     filtered=tickets
     if sf!="All": filtered=[t for t in filtered if t["status"]==sf]
