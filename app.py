@@ -96,6 +96,14 @@ def sheet(tab):
 
 NOTIFY_EMAILS = ["admin@morepenpdr.com","mpdr.services@gmail.com"]
 
+# Department → recipient email mapping
+DEPT_EMAILS = {
+    "IT":              "admin@morepenpdr.com",
+    "Lab Maintenance": "narendra.s@morepenpdr.com",
+    "HR":              "hr@morepenpdr.com",
+    "Safety":          "admin@morepenpdr.com",
+}
+
 def send_email(to_list, subject, html_body):
     try:
         user = st.secrets["gmail"]["user"]
@@ -135,7 +143,9 @@ def email_new_ticket(t):
 <p style="color:#8b949e;font-size:0.82rem;margin:0 0 6px 0;">DESCRIPTION</p>
 <p style="color:#e6edf3;margin:0;line-height:1.6;">{t['description']}</p></div>
 <p style="color:#8b949e;font-size:0.8rem;text-align:center;">Login to MPDR Issue Tracker to manage this ticket.</p></div>"""
-    send_email(NOTIFY_EMAILS, subj, html)
+    # Route to the department-specific email; fall back to all admins
+    recipient = DEPT_EMAILS.get(t.get('assigned_to',''), NOTIFY_EMAILS)
+    send_email(recipient, subj, html)
 
 def email_resolved(t):
     subj = f"[MPDR] ✅ Your ticket #{t['ticket_id'][:8].upper()} has been resolved"
@@ -290,7 +300,7 @@ def page_create():
             a,b,c=st.columns(3)
             with a: cat =st.selectbox("Category *",["Equipment Failure","Software Issue","Safety Concern","Chemical Handling","Facility Problem","Network / IT","Documentation","Other"])
             with b: prio=st.selectbox("Priority *",["Low","Medium","High","Critical"])
-            with c: dept=st.selectbox("Assign To *",["IT","Lab Maintenance","Safety"])
+            with c: dept=st.selectbox("Assign To *",["IT","Lab Maintenance","HR","Safety"])
             st.markdown("<br>",unsafe_allow_html=True)
             sub=st.form_submit_button("🚀  Submit Ticket",use_container_width=True)
         if sub:
@@ -298,7 +308,8 @@ def page_create():
             else:
                 with st.spinner("Submitting and notifying..."):
                     tid=create_ticket(title.strip(),desc.strip(),cat,prio,dept,st.session_state.email)
-                st.success(f"✅ **Ticket submitted!** ID: `#{tid[:8].upper()}` · Notification sent to admin@morepenpdr.com")
+                dept_email = DEPT_EMAILS.get(dept, "admin@morepenpdr.com")
+                st.success(f"✅ **Ticket submitted!** ID: `#{tid[:8].upper()}` · Notification sent to {dept_email}")
     with c2:
         st.markdown("""<div class="info-card"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">📌 Priority Guide</p>
 <div style="margin-bottom:8px;"><span class="badge b-critical">Critical</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Safety risk / production stopped</span></div>
@@ -306,7 +317,7 @@ def page_create():
 <div style="margin-bottom:8px;"><span class="badge b-medium">Medium</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Moderate disruption</span></div>
 <div><span class="badge b-low">Low</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Minor / non-urgent</span></div></div>
 <div class="info-card" style="margin-top:1rem;"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">🏢 Departments</p>
-<div style="color:#8b949e;font-size:0.85rem;line-height:2;">🖥️ <b style="color:#e6edf3;">IT</b> — Software, network<br>🧪 <b style="color:#e6edf3;">Lab Maintenance</b> — Equipment<br>⚠️ <b style="color:#e6edf3;">Safety</b> — Hazards, compliance</div></div>""",unsafe_allow_html=True)
+<div style="color:#8b949e;font-size:0.85rem;line-height:2;">🖥️ <b style="color:#e6edf3;">IT</b> — Software, network<br>🧪 <b style="color:#e6edf3;">Lab Maintenance</b> — Equipment<br>👥 <b style="color:#e6edf3;">HR</b> — HR matters<br>⚠️ <b style="color:#e6edf3;">Safety</b> — Hazards, compliance</div></div>""",unsafe_allow_html=True)
 
 def page_my_tickets():
     st.markdown('<div class="page-header"><div class="page-title">📋 My Tickets</div><div class="page-sub">Track all issues you have reported</div></div>',unsafe_allow_html=True)
