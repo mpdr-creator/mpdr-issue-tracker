@@ -81,11 +81,11 @@ h1,h2,h3,h4 { color:#0d2d5e !important; }
 ::-webkit-scrollbar-thumb { background:#38b6ff; border-radius:3px; }
 ::-webkit-scrollbar-thumb:hover { background:#0d2d5e; }
 .sidebar-user { background:rgba(255,255,255,0.12); border:1px solid rgba(56,182,255,0.3); border-radius:10px; padding:0.9rem 1rem; margin-bottom:1rem; }
-/* hide raw Material-icons text on sidebar collapse/expand button */
-button[kind="header"] { font-size:0 !important; }
-button[kind="header"] * { font-size:0 !important; }
-[data-testid="collapsedControl"] { font-size:0 !important; }
-[data-testid="collapsedControl"] * { font-size:0 !important; }
+/* hide sidebar collapse button & raw Material-icon text */
+[data-testid="stSidebarCollapseButton"] { display:none !important; }
+[data-testid="collapsedControl"] { display:none !important; }
+[data-testid="stIconMaterial"] { display:none !important; }
+button[data-testid="baseButton-headerNoPadding"] span { visibility:hidden !important; font-size:0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -322,7 +322,7 @@ def page_create():
 <div style="margin-bottom:8px;"><span class="badge b-medium">Medium</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Moderate disruption</span></div>
 <div><span class="badge b-low">Low</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Minor / non-urgent</span></div></div>
 <div class="info-card" style="margin-top:1rem;"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">🏢 Departments</p>
-<div style="color:#8b949e;font-size:0.85rem;line-height:2;">🖥️ <b style="color:#e6edf3;">IT</b> — Software, network<br>🧪 <b style="color:#e6edf3;">Lab Maintenance</b> — Equipment<br>👥 <b style="color:#e6edf3;">HR</b> — HR matters<br>⚠️ <b style="color:#e6edf3;">Safety</b> — Hazards, compliance</div></div>""",unsafe_allow_html=True)
+<div style="color:#8b949e;font-size:0.85rem;line-height:2;">🖥️ <b style="color:#0d2d5e;">IT</b> — Software, network<br>🧪 <b style="color:#0d2d5e;">Lab Maintenance</b> — Equipment<br>👥 <b style="color:#0d2d5e;">HR</b> — HR matters<br>⚠️ <b style="color:#0d2d5e;">Safety</b> — Hazards, compliance</div></div>""",unsafe_allow_html=True)
 
 def page_my_tickets():
     st.markdown('<div class="page-header"><div class="page-title">📋 My Tickets</div><div class="page-sub">Track all issues you have reported</div></div>',unsafe_allow_html=True)
