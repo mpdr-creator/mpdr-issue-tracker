@@ -109,8 +109,29 @@ DEPT_EMAILS = {
     "Safety":          "admin@morepenpdr.com",
 }
 
+# Status transitions
+ALLOWED_TRANSITIONS = {
+    "OPEN": ["ASSIGNED"],
+    "ASSIGNED": ["IN_PROGRESS"],
+    "IN_PROGRESS": ["RESOLVED"],
+    "RESOLVED": ["CLOSED"]
+}
+
 # SLA resolution deadlines (hours) per priority
 SLA_HOURS = {"Critical": 4, "High": 24, "Medium": 72, "Low": 168}
+
+def get_or_create_sheet(name, cols):
+    client = get_client().open("MPDR Issue Tracker")
+    if name not in [ws.title for ws in client.worksheets()]:
+        ws = client.add_worksheet(title=name, rows=1000, cols=len(cols))
+        ws.append_row(cols)
+    return client.worksheet(name)
+
+def log_ticket_history(tid, old_status, new_status, by, notes=""):
+    if old_status == new_status: return
+    ws = get_or_create_sheet("ticket_history", ["ticket_id", "old_status", "new_status", "updated_by", "timestamp", "notes"])
+    ws.append_row([tid, old_status, new_status, by, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), notes])
+
 
 def send_email(to_list, subject, html_body):
     try:
@@ -203,16 +224,43 @@ def update_ticket(tid,status,notes=""):
     ws,row,t=find_row(tid)
     if not row: return
     now=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    old_status = t["status"]
     ws.update_cell(row,6,status); ws.update_cell(row,10,now)
     if notes: ws.update_cell(row,11,notes)
     if status=="RESOLVED":
         t["resolution_notes"]=notes; t["updated_at"]=now; email_resolved(t)
+    log_ticket_history(tid, old_status, status, st.session_state.get("email","System"), notes)
 
 def all_feedback():   return sheet("feedback").get_all_records()
 def has_fb(tid):      return any(f["ticket_id"]==tid for f in all_feedback())
 def submit_fb(tid,by,rating,comments):
     sheet("feedback").append_row([tid,by,rating,comments,datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
     update_ticket(tid,"CLOSED")
+
+def all_ticket_comments():
+    try:
+        return get_or_create_sheet("ticket_comments", ["ticket_id", "user", "timestamp", "comment"]).get_all_records()
+    except Exception:
+        return []
+
+def add_ticket_comment(tid, user, comment):
+    if not comment.strip(): return
+    ws = get_or_create_sheet("ticket_comments", ["ticket_id", "user", "timestamp", "comment"])
+    ws.append_row([tid, user, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), comment])
+
+def render_comments_ui(t, all_comms):
+    comms = [c for c in all_comms if c["ticket_id"] == t["ticket_id"]]
+    st.markdown(f"💬 **Comments ({len(comms)})**")
+    if comms:
+        for c in comms:
+            st.markdown(f"<div style='background:#161b22;padding:8px 12px;border-radius:6px;margin-bottom:8px;'><div style='font-size:0.8rem;color:#8b949e;'><b>{c['user']}</b> · {c['timestamp']}</div><div style='font-size:0.9rem;'>{c['comment']}</div></div>", unsafe_allow_html=True)
+    nc1, nc2 = st.columns([4, 1])
+    with nc1:
+        new_c = st.text_input("Add a comment", key=f"nc_{t['ticket_id']}", label_visibility="collapsed", placeholder="Type a comment...")
+    with nc2:
+        if st.button("Post", key=f"btn_c_{t['ticket_id']}", use_container_width=True):
+            add_ticket_comment(t["ticket_id"], st.session_state.email, new_c)
+            st.rerun()
 
 def get_sla_info(ticket):
     """Return dict: elapsed_h, remaining_h, pct, status for a ticket."""
@@ -247,13 +295,54 @@ def sla_badge(info):
             f'padding:2px 8px;font-size:0.75rem;font-weight:600;color:{colour};">'
             f'{icon} {s} &middot; {time_str}</span>')
 
+def email_sla_warning(t):
+    subj = f"[MPDR] ⚠️ SLA Warning: Ticket #{t['ticket_id'][:8].upper()} at 75% Time"
+    html = f"""<div style="font-family:Arial,sans-serif;background:#0d1117;color:#e6edf3;padding:30px;border-radius:12px;max-width:600px;margin:0 auto;">
+<div style="text-align:center;margin-bottom:24px;"><div style="font-size:2.5rem;">⚠️</div>
+<h2 style="color:#f0a500;margin:8px 0 4px 0;">SLA Warning (75% Elapsed)</h2>
+<p style="color:#8b949e;font-size:0.85rem;margin:0;">Please review this ticket ASAP</p></div>
+<div style="background:#161b22;border:1px solid #21262d;border-left:4px solid #f0a500;border-radius:10px;padding:20px;margin-bottom:16px;">
+<table style="width:100%;border-collapse:collapse;">
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;width:140px;">TICKET ID</td><td style="color:#58a6ff;font-family:monospace;font-weight:600;">#{t['ticket_id'][:8].upper()}</td></tr>
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">TITLE</td><td style="color:#e6edf3;font-weight:600;">{t['title']}</td></tr>
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">DEPARTMENT</td><td style="color:#e6edf3;">{t['assigned_to']}</td></tr>
+<tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">PRIORITY</td><td><span style="background:#4d1a00;color:#ff7b72;padding:2px 8px;border-radius:10px;font-size:0.78rem;font-weight:600;">{t['priority']}</span></td></tr>
+</table></div>
+<p style="color:#8b949e;font-size:0.8rem;text-align:center;">MPDR Issue Tracker · Morepen Laboratories</p></div>"""
+    return send_email("admin@morepenpdr.com", subj, html)
+
+@st.cache_data(ttl=300, show_spinner=False)
+def check_sla_warnings(_tickets):
+    try:
+        warnings_ws = get_or_create_sheet("sla_warnings", ["ticket_id", "timestamp"])
+        sent_warnings = [r["ticket_id"] for r in warnings_ws.get_all_records()]
+    except Exception:
+        sent_warnings = []
+    
+    new_warnings = False
+    for t in _tickets:
+        if t.get("status") not in ("RESOLVED", "CLOSED"):
+            sla = get_sla_info(t)
+            if sla["pct"] >= 75 and t["ticket_id"] not in sent_warnings:
+                if email_sla_warning(t):
+                    try:
+                        warnings_ws.append_row([t["ticket_id"], datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+                        sent_warnings.append(t["ticket_id"])
+                        new_warnings = True
+                    except Exception:
+                        pass
+    if new_warnings:
+        st.cache_data.clear()
+
 
 SC={"OPEN":"b-open","ASSIGNED":"b-assigned","IN_PROGRESS":"b-inprog","RESOLVED":"b-resolved","CLOSED":"b-closed"}
 PC={"Low":"b-low","Medium":"b-medium","High":"b-high","Critical":"b-critical"}
 PB={"Low":"low","Medium":"medium","High":"high","Critical":"critical"}
 def sb(s): return f'<span class="badge {SC.get(s,"b-open")}">{s}</span>'
 def pb(p): return f'<span class="badge {PC.get(p,"b-low")}">{p}</span>'
-def st_stars(n): return "⭐"*int(n)+"☆"*(5-int(n))
+def st_stars(n):
+    val = min(5, max(0, int(float(n))))
+    return "⭐"*val+"☆"*(5-val)
 
 for k,v in [("logged_in",False),("email",""),("role",""),("dept",""),("page","login")]:
     if k not in st.session_state: st.session_state[k]=v
@@ -290,7 +379,7 @@ def login_page():
             rp2=st.text_input("Confirm Password",type="password",key="re_p2")
             rr=st.selectbox("Role",["scientist","admin","management"],key="re_r")
             rd=""
-            if rr=="admin": rd=st.selectbox("Department",["IT","Lab Maintenance","Safety"],key="re_d")
+            if rr=="admin": rd=st.selectbox("Department",["IT","Lab Maintenance","Safety","HR"],key="re_d")
             st.markdown("<br>",unsafe_allow_html=True)
             if st.button("Create Account →",use_container_width=True,key="btn_re"):
                 if not re.endswith("@morepenpdr.com"): st.error("⛔ Only @morepenpdr.com emails allowed.")
@@ -376,13 +465,17 @@ def page_my_tickets():
     with d: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#f0a500;">{pf}</div><div class="stat-label">Pending Feedback</div></div>',unsafe_allow_html=True)
 
     st.markdown("<br>",unsafe_allow_html=True)
-    c1,c2=st.columns(2)
+    c1,c2,c3=st.columns(3)
     with c1: sf=st.selectbox("Status",["All","OPEN","ASSIGNED","IN_PROGRESS","RESOLVED","CLOSED"])
     with c2: pf2=st.selectbox("Priority",["All","Critical","High","Medium","Low"])
+    with c3: df=st.selectbox("Department",["All","IT","Lab Maintenance","HR","Safety"])
     filtered=list(reversed(tickets))
     if sf!="All": filtered=[t for t in filtered if t["status"]==sf]
     if pf2!="All": filtered=[t for t in filtered if t["priority"]==pf2]
+    if df!="All": filtered=[t for t in filtered if t["assigned_to"]==df]
     st.markdown(f"<p style='color:#8b949e;font-size:0.85rem;'>{len(filtered)} ticket(s)</p>",unsafe_allow_html=True)
+
+    all_comms = all_ticket_comments()
 
     for t in filtered:
         bc=PB.get(t["priority"],"low")
@@ -405,6 +498,8 @@ def page_my_tickets():
             fb=next((f for f in all_feedback() if f["ticket_id"]==t["ticket_id"]),None)
             if fb:
                 st.markdown(f"""<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px 12px;margin-top:-8px;margin-bottom:8px;"><span style="color:#8b949e;font-size:0.8rem;">Your feedback: </span><span style="font-size:1rem;">{st_stars(fb['rating'])}</span>{f'<span style="color:#8b949e;font-size:0.82rem;"> · {fb["comments"]}</span>' if fb.get("comments") else ""}</div>""",unsafe_allow_html=True)
+        with st.expander("💬 View/Add Comments"):
+            render_comments_ui(t, all_comms)
 
 def page_dept():
     dept=st.session_state.dept
@@ -421,8 +516,13 @@ def page_dept():
     st.markdown("<br>",unsafe_allow_html=True)
     po={"Critical":0,"High":1,"Medium":2,"Low":3}
     tickets=sorted(tickets,key=lambda x:po.get(x["priority"],4))
-    pf=st.selectbox("Filter by Priority",["All","Critical","High","Medium","Low"])
+    c1,c2=st.columns(2)
+    with c1: sf=st.selectbox("Filter by Status",["All","OPEN","ASSIGNED","IN_PROGRESS"])
+    with c2: pf=st.selectbox("Filter by Priority",["All","Critical","High","Medium","Low"])
+    if sf!="All": tickets=[t for t in tickets if t["status"]==sf]
     if pf!="All": tickets=[t for t in tickets if t["priority"]==pf]
+
+    all_comms = all_ticket_comments()
 
     for t in tickets:
         with st.expander(f"#{t['ticket_id'][:8].upper()} · {t['title']}  |  {t['priority']}  |  {t['status']}"):
@@ -443,6 +543,7 @@ def page_dept():
                 st.markdown(f"""<div class="info-card"><p style="color:#8b949e;font-size:0.78rem;margin:0 0 10px 0;">DESCRIPTION</p>
 <p style="color:#e6edf3;line-height:1.6;font-size:0.9rem;">{t['description']}</p></div>""",unsafe_allow_html=True)
 
+            render_comments_ui(t, all_comms)
             st.markdown("**Update Ticket**")
             u1,u2=st.columns(2)
             with u1:
@@ -455,6 +556,8 @@ def page_dept():
             if ns=="RESOLVED": st.warning("⚠️ This will send a feedback email to the reporter.")
             if st.button(f"✅ Update #{t['ticket_id'][:8].upper()}",key=f"upd_{t['ticket_id']}"):
                 if ns=="RESOLVED" and not notes.strip(): st.error("Add resolution notes before marking resolved.")
+                elif ns != t["status"] and ns not in ALLOWED_TRANSITIONS.get(t["status"], []):
+                    st.error(f"Invalid transition from {t['status']} to {ns}. Allowed: {', '.join(ALLOWED_TRANSITIONS.get(t['status'], []))}")
                 else:
                     with st.spinner("Updating..."):
                         update_ticket(t["ticket_id"],ns,notes)
@@ -522,10 +625,33 @@ def page_dashboard():
 <div style="font-size:2.5rem;font-weight:700;color:#f0a500;">{avg:.1f} / 5.0</div>
 <div style="font-size:1.8rem;">{st_stars(round(avg))}</div>
 <div style="color:#8b949e;font-size:0.85rem;margin-top:0.3rem;">Based on {len(fbs)} feedback response(s)</div></div>""",unsafe_allow_html=True)
-    all_t=all_tickets()
-    closed_t=[t for t in all_t if t.get("status") in ("RESOLVED","CLOSED")]
-    breached=[t for t in all_t if get_sla_info(t)["status"]=="Breached"]
-    at_risk=[t for t in all_t if get_sla_info(t)["status"]=="At Risk"]
+    closed_t=[t for t in tickets if t.get("status") in ("RESOLVED","CLOSED")]
+    breached=[t for t in tickets if get_sla_info(t)["status"]=="Breached"]
+    at_risk=[t for t in tickets if get_sla_info(t)["status"]=="At Risk"]
+
+    c1,c2=st.columns(2)
+    with c1:
+        if closed_t:
+            res_df = pd.DataFrame(closed_t)
+            res_df['created_at'] = pd.to_datetime(res_df['created_at'], errors='coerce')
+            res_df['updated_at'] = pd.to_datetime(res_df['updated_at'], errors='coerce')
+            res_df['res_hours'] = (res_df['updated_at'] - res_df['created_at']).dt.total_seconds() / 3600
+            res_avg = res_df.groupby("assigned_to")["res_hours"].mean().reset_index()
+            res_avg.columns = ["Department", "Avg Hours"]
+            fig5=px.bar(res_avg,x="Department",y="Avg Hours",title="Avg Resolution Time (hrs)",color="Avg Hours",color_continuous_scale=["#3fb950","#f0a500","#ff7b72"])
+            st.plotly_chart(sty(fig5),use_container_width=True)
+        else:
+            st.info("Not enough data for Resolution Time chart.")
+    with c2:
+        if breached:
+            breach_df = pd.DataFrame(breached)
+            b_counts = breach_df["assigned_to"].value_counts().reset_index()
+            b_counts.columns = ["Department", "Breaches"]
+            fig6=px.bar(b_counts,x="Department",y="Breaches",title="SLA Breaches by Dept",color="Breaches",color_continuous_scale=["#ff4444","#e53935","#b71c1c"])
+            st.plotly_chart(sty(fig6),use_container_width=True)
+        else:
+            st.info("✅ No SLA Breaches!")
+
     if closed_t:
         on_time=[t for t in closed_t if get_sla_info(t)["status"]=="N/A"]
         compliance=len(on_time)/len(closed_t)*100
@@ -564,6 +690,7 @@ def page_all_tickets():
 def main():
     if not st.session_state.logged_in:
         login_page(); return
+    check_sla_warnings(all_tickets())
     render_sidebar()
     role=st.session_state.role; page=st.session_state.page
     if role=="scientist":
