@@ -403,6 +403,17 @@ def st_stars(n):
     val = min(5, max(0, int(float(n))))
     return "⭐"*val+"☆"*(5-val)
 
+def get_resolution_time_str(t):
+    if t.get("status") not in ["RESOLVED", "CLOSED"]: return ""
+    if not t.get("created_at") or not t.get("updated_at"): return ""
+    try:
+        cat = pd.to_datetime(t["created_at"])
+        uat = pd.to_datetime(t["updated_at"])
+        hrs = (uat - cat).total_seconds() / 3600
+        if hrs < 1: return f"{int(hrs*60)} mins"
+        return f"{hrs:.1f} hrs"
+    except: return ""
+
 for k,v in [("logged_in",False),("email",""),("role",""),("dept",""),("page","login")]:
     if k not in st.session_state: st.session_state[k]=v
 
@@ -561,10 +572,12 @@ def page_my_tickets():
     for t in filtered:
         bc=PB.get(t["priority"],"low")
         rh=f"""<div style="background:#1b3a2d;border:1px solid #238636;border-radius:6px;padding:8px 12px;margin-top:8px;"><span style="color:#3fb950;font-size:0.8rem;font-weight:600;">✅ RESOLUTION: </span><span style="color:#e6edf3;font-size:0.85rem;">{t['resolution_notes']}</span></div>""" if t.get("resolution_notes") else ""
+        rt = get_resolution_time_str(t)
+        rt_badge = f" &nbsp;&nbsp; ⏱️ Time: {rt}" if rt else ""
         st.markdown(f"""<div class="ticket-card {bc}"><div class="ticket-id">#{t['ticket_id'][:8].upper()}</div>
 <div class="ticket-title">{t['title']}</div>
 <div class="ticket-desc">{t['description'][:200]}{'...' if len(t['description'])>200 else ''}</div>
-{rh}<div class="ticket-meta">{sb(t['status'])} &nbsp; {pb(t['priority'])} &nbsp; 🏢 {t['assigned_to']} &nbsp;&nbsp; 📅 {t['created_at']} &nbsp;&nbsp; {sla_badge(get_sla_info(t))}</div></div>""",unsafe_allow_html=True)
+{rh}<div class="ticket-meta">{sb(t['status'])} &nbsp; {pb(t['priority'])} &nbsp; 🏢 {t['assigned_to']} &nbsp;&nbsp; 📅 {t['created_at']} &nbsp;&nbsp; {sla_badge(get_sla_info(t))}{rt_badge}</div></div>""",unsafe_allow_html=True)
 
         if t["status"]=="RESOLVED" and not has_fb(t["ticket_id"]):
             with st.expander(f"⭐ Submit Feedback — #{t['ticket_id'][:8].upper()}"):
@@ -658,9 +671,11 @@ def page_resolved():
             fb_ui = f'<div style="margin-top:6px;color:#f0a500;font-size:0.85rem;">{st_stars(fb["rating"])}{c_str}</div>'
         else:
             fb_ui = '<div style="margin-top:6px;color:#8b949e;font-size:0.82rem;">⏳ Awaiting feedback</div>'
+        rt = get_resolution_time_str(t)
+        rt_badge = f" &nbsp;&nbsp; ⏱️ Time: {rt}" if rt else ""
         st.markdown(f"""<div class="ticket-card low"><div class="ticket-id">#{t['ticket_id'][:8].upper()}</div>
 <div class="ticket-title">{t['title']}</div>
-<div class="ticket-meta">{sb(t['status'])} &nbsp; {pb(t['priority'])} &nbsp; 👤 {t['created_by']} &nbsp;&nbsp; 📅 {t['updated_at']}</div>
+<div class="ticket-meta">{sb(t['status'])} &nbsp; {pb(t['priority'])} &nbsp; 👤 {t['created_by']} &nbsp;&nbsp; 📅 {t['updated_at']}{rt_badge}</div>
 {f'<div style="margin-top:8px;color:#3fb950;font-size:0.85rem;">✅ {t["resolution_notes"]}</div>' if t.get("resolution_notes") else ""}
 {fb_ui}
 </div>""",unsafe_allow_html=True)
@@ -767,11 +782,41 @@ def page_all_tickets():
     if srch:
         s=srch.lower(); filtered=[t for t in filtered if s in t["title"].lower() or s in t["created_by"].lower()]
     st.markdown(f"<p style='color:#8b949e;font-size:0.85rem;'>{len(filtered)} ticket(s)</p>",unsafe_allow_html=True)
-    if filtered:
-        disp=pd.DataFrame(filtered)[["ticket_id","title","category","priority","status","assigned_to","created_by","created_at"]].copy()
-        disp["ticket_id"]=disp["ticket_id"].str[:8].str.upper()
-        disp.columns=["ID","Title","Category","Priority","Status","Department","Reporter","Created"]
-        st.dataframe(disp,use_container_width=True,hide_index=True)
+    
+    t1, t2 = st.tabs(["Tickets Raised", "Resolved/Closed"])
+    
+    active_t = [t for t in filtered if t["status"] not in ["RESOLVED", "CLOSED"]]
+    res_t = [t for t in filtered if t["status"] in ["RESOLVED", "CLOSED"]]
+    
+    with t1:
+        if active_t:
+            disp=pd.DataFrame(active_t)[["ticket_id","title","category","priority","status","assigned_to","created_by","created_at"]].copy()
+            disp["ticket_id"]=disp["ticket_id"].str[:8].str.upper()
+            disp.columns=["ID","Title","Category","Priority","Status","Department","Reporter","Created"]
+            st.dataframe(disp,use_container_width=True,hide_index=True)
+        else:
+            st.info("No tickets found in this category.")
+            
+    with t2:
+        if res_t:
+            fbs={f["ticket_id"]:f for f in all_feedback()}
+            for t in reversed(res_t):
+                fb=fbs.get(t["ticket_id"])
+                if fb:
+                    c_str = f" &middot; {fb['comments']}" if fb.get("comments") else ""
+                    fb_ui = f'<div style="margin-top:6px;color:#f0a500;font-size:0.85rem;">{st_stars(fb["rating"])}{c_str}</div>'
+                else:
+                    fb_ui = '<div style="margin-top:6px;color:#8b949e;font-size:0.82rem;">⏳ Awaiting feedback</div>'
+                rt = get_resolution_time_str(t)
+                rt_badge = f" &nbsp;&nbsp; ⏱️ Time: {rt}" if rt else ""
+                st.markdown(f"""<div class="ticket-card low"><div class="ticket-id">#{t['ticket_id'][:8].upper()}</div>
+<div class="ticket-title">{t['title']}</div>
+<div class="ticket-meta">{sb(t['status'])} &nbsp; {pb(t['priority'])} &nbsp; 🏢 {t['assigned_to']} &nbsp; 👤 {t['created_by']} &nbsp;&nbsp; 📅 {t['updated_at']}{rt_badge}</div>
+{f'<div style="margin-top:8px;color:#3fb950;font-size:0.85rem;">✅ {t["resolution_notes"]}</div>' if t.get("resolution_notes") else ""}
+{fb_ui}
+</div>""",unsafe_allow_html=True)
+        else:
+            st.info("No resolved or closed tickets found.")
 
 def main():
     if not st.session_state.logged_in:
