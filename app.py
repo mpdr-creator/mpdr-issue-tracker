@@ -263,11 +263,11 @@ def find_row(tid):
         if r["ticket_id"]==tid: return ws,i,r
     return None,None,None
 
-def create_ticket(title,desc,cat,prio,dept,creator):
+def create_ticket(title,desc,cat,prio,dept,creator,rep_dept="Analytics"):
     tid=str(uuid.uuid4()); now=now_ist().strftime("%Y-%m-%d %H:%M:%S")
-    sheet("tickets").append_row([tid,title,desc,cat,prio,"OPEN",creator,dept,now,now,""])
+    sheet("tickets").append_row([tid,title,desc,cat,prio,"OPEN",creator,dept,now,now,"", "", rep_dept])
     t=dict(ticket_id=tid,title=title,description=desc,category=cat,priority=prio,
-           status="OPEN",created_by=creator,assigned_to=dept,created_at=now,updated_at=now,resolution_notes="")
+           status="OPEN",created_by=creator,assigned_to=dept,created_at=now,updated_at=now,resolution_notes="", reporter_dept=rep_dept)
     email_new_ticket(t); return tid
 
 def update_ticket(tid,status,notes=""):
@@ -536,17 +536,18 @@ def page_create():
         with st.form("new_t",clear_on_submit=True):
             title=st.text_input("Issue Title *",placeholder="e.g. HPLC system not responding in Lab 3")
             desc =st.text_area("Detailed Description *",placeholder="Describe the issue clearly...",height=140)
-            a,b,c=st.columns(3)
+            a,b,c,d=st.columns(4)
             with a: cat =st.selectbox("Category *",["Equipment Failure","Software Issue","Safety Concern","Chemical Handling","Facility Problem","Network / IT","Documentation","Other"])
             with b: prio=st.selectbox("Priority *",["Low","Medium","High","Critical"])
             with c: dept=st.selectbox("Assign To *",["IT","Lab Maintenance","HR","Safety"])
+            with d: r_dept=st.selectbox("Your Department *", ["CADD", "API", "MedChem", "AR&D", "QA/QC"])
             st.markdown("<br>",unsafe_allow_html=True)
             sub=st.form_submit_button("🚀  Submit Ticket",use_container_width=True)
         if sub:
             if not title.strip() or not desc.strip(): st.error("⛔ Title and description are required.")
             else:
                 with st.spinner("Submitting and notifying..."):
-                    tid=create_ticket(title.strip(),desc.strip(),cat,prio,dept,st.session_state.email)
+                    tid=create_ticket(title.strip(),desc.strip(),cat,prio,dept,st.session_state.email,r_dept)
                 dept_email = DEPT_EMAILS.get(dept, "admin@morepenpdr.com")
                 st.success(f"✅ **Ticket submitted!** ID: `#{tid[:8].upper()}` · Notification sent to {dept_email}")
     with c2:
@@ -737,15 +738,20 @@ def page_dashboard():
     def sty(fig):
         fig.update_layout(paper_bgcolor=BG,plot_bgcolor=BG,font_color=FC,title_font_color="#58a6ff",title_font_size=14,margin=dict(t=40,b=20,l=20,r=20),legend=dict(bgcolor=BG,bordercolor=GC))
         fig.update_xaxes(gridcolor=GC,zerolinecolor=GC); fig.update_yaxes(gridcolor=GC,zerolinecolor=GC); return fig
-    c1,c2=st.columns(2)
+    c1,c2,c3=st.columns(3)
     with c1:
         sc=df["status"].value_counts().reset_index(); sc.columns=["Status","Count"]
         cm={"OPEN":"#58a6ff","ASSIGNED":"#f0a500","IN_PROGRESS":"#3fb950","RESOLVED":"#56d364","CLOSED":"#8b949e"}
         fig=px.pie(sc,values="Count",names="Status",title="Tickets by Status",color="Status",color_discrete_map=cm,hole=0.45)
         fig.update_traces(textfont_color=FC); st.plotly_chart(sty(fig),use_container_width=True,theme=None)
     with c2:
+        if "reporter_dept" in df.columns:
+            rdc=df["reporter_dept"].value_counts().reset_index(); rdc.columns=["ReporterDept","Count"]
+            fig_rd=px.pie(rdc,values="Count",names="ReporterDept",title="Tickets by Scientist Dept",color_discrete_sequence=px.colors.sequential.Teal)
+            fig_rd.update_traces(textfont_color=FC); st.plotly_chart(sty(fig_rd),use_container_width=True,theme=None)
+    with c3:
         dc=df["assigned_to"].value_counts().reset_index(); dc.columns=["Department","Count"]
-        fig2=px.bar(dc,x="Department",y="Count",title="Tickets by Department",color="Count",color_continuous_scale=["#1f6feb","#58a6ff","#79c0ff"])
+        fig2=px.bar(dc,x="Department",y="Count",title="Tickets by Assignee Dept",color="Count",color_continuous_scale=["#1f6feb","#58a6ff","#79c0ff"])
         st.plotly_chart(sty(fig2),use_container_width=True,theme=None)
     c1,c2=st.columns(2)
     with c1:
