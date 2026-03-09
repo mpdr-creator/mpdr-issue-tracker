@@ -512,20 +512,20 @@ def page_create():
   </thead>
   <tbody>
     <tr style="border-bottom:1px solid #e8f4ff;">
-      <td style="padding:4px;"><span class="badge b-critical" style="background: darkred;">Critical</span></td>
-      <td style="padding:4px; color:#e6edf3;">24hrs</td>
+      <td style="padding:4px;"><span class="badge b-critical" style="background:#fca5a5;">Critical</span></td>
+      <td style="padding:4px; color:#8b949e;">24hrs</td>
     </tr>
     <tr style="border-bottom:1px solid #e8f4ff;">
-      <td style="padding:4px;"><span class="badge b-high" style="background: red;">High</span></td>
-      <td style="padding:4px; color:#e6edf3;">48hrs</td>
+      <td style="padding:4px;"><span class="badge b-high">High</span></td>
+      <td style="padding:4px; color:#8b949e;">48hrs</td>
     </tr>
     <tr style="border-bottom:1px solid #e8f4ff;">
-      <td style="padding:4px;"><span class="badge b-medium" style="background: yellow; color: black;">Medium</span></td>
-      <td style="padding:4px; color:#e6edf3;">72hrs</td>
+      <td style="padding:4px;"><span class="badge b-medium">Medium</span></td>
+      <td style="padding:4px; color:#8b949e;">72hrs</td>
     </tr>
     <tr>
-      <td style="padding:4px;"><span class="badge b-low" style="background: green;">Low</span></td>
-      <td style="padding:4px; color:#e6edf3;">96hrs</td>
+      <td style="padding:4px;"><span class="badge b-low">Low</span></td>
+      <td style="padding:4px; color:#8b949e;">96hrs</td>
     </tr>
   </tbody>
 </table>
