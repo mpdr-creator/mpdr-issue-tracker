@@ -736,33 +736,36 @@ def page_dashboard():
 
     BG="#161b22"; FC="#e6edf3"; GC="#21262d"
     def sty(fig):
-        fig.update_layout(paper_bgcolor=BG,plot_bgcolor=BG,font_color=FC,title_font_color="#58a6ff",title_font_size=14,margin=dict(t=40,b=20,l=20,r=20),legend=dict(bgcolor=BG,bordercolor=GC))
+        fig.update_layout(paper_bgcolor=BG,plot_bgcolor=BG,font_color=FC,title_font_color="#58a6ff",title_font_size=15,margin=dict(t=50,b=30,l=20,r=20),legend=dict(bgcolor=BG,bordercolor=GC))
         fig.update_xaxes(gridcolor=GC,zerolinecolor=GC); fig.update_yaxes(gridcolor=GC,zerolinecolor=GC); return fig
-    c1,c2,c3=st.columns(3)
+    c1,c2=st.columns(2)
     with c1:
         sc=df["status"].value_counts().reset_index(); sc.columns=["Status","Count"]
         cm={"OPEN":"#58a6ff","ASSIGNED":"#f0a500","IN_PROGRESS":"#3fb950","RESOLVED":"#56d364","CLOSED":"#8b949e"}
-        fig=px.pie(sc,values="Count",names="Status",title="Tickets by Status",color="Status",color_discrete_map=cm,hole=0.45)
-        fig.update_traces(textfont_color=FC); st.plotly_chart(sty(fig),use_container_width=True,theme=None)
-    with c2:
-        if "reporter_dept" in df.columns:
-            rdc=df["reporter_dept"].value_counts().reset_index(); rdc.columns=["ReporterDept","Count"]
-            fig_rd=px.pie(rdc,values="Count",names="ReporterDept",title="Tickets by Scientist Dept",color_discrete_sequence=px.colors.sequential.Teal)
-            fig_rd.update_traces(textfont_color=FC); st.plotly_chart(sty(fig_rd),use_container_width=True,theme=None)
-    with c3:
-        dc=df["assigned_to"].value_counts().reset_index(); dc.columns=["Department","Count"]
-        fig2=px.bar(dc,x="Department",y="Count",title="Tickets by Assignee Dept",color="Count",color_continuous_scale=["#1f6feb","#58a6ff","#79c0ff"])
-        st.plotly_chart(sty(fig2),use_container_width=True,theme=None)
-    c1,c2=st.columns(2)
-    with c1:
-        cc=df["category"].value_counts().reset_index(); cc.columns=["Category","Count"]
-        fig3=px.bar(cc,x="Count",y="Category",orientation="h",title="Top Issue Categories",color="Count",color_continuous_scale=["#238636","#3fb950","#56d364"])
-        st.plotly_chart(sty(fig3),use_container_width=True,theme=None)
+        fig1=px.pie(sc,values="Count",names="Status",title="Tickets by Status",color="Status",color_discrete_map=cm,hole=0.45)
+        fig1.update_traces(textfont_color=FC, textposition='inside'); st.plotly_chart(sty(fig1),use_container_width=True,theme=None)
     with c2:
         pc=df["priority"].value_counts().reset_index(); pc.columns=["Priority","Count"]
         pcm={"Low":"#3fb950","Medium":"#f0a500","High":"#ff7b72","Critical":"#ff4444"}
-        fig4=px.bar(pc,x="Priority",y="Count",title="Tickets by Priority",color="Priority",color_discrete_map=pcm)
+        fig2=px.bar(pc,x="Priority",y="Count",title="Tickets by Priority",color="Priority",color_discrete_map=pcm)
+        st.plotly_chart(sty(fig2),use_container_width=True,theme=None)
+        
+    c3,c4=st.columns(2)
+    with c3:
+        cc=df["category"].value_counts().reset_index(); cc.columns=["Category","Count"]
+        fig3=px.bar(cc,x="Count",y="Category",orientation="h",title="Top Issue Categories",color="Count",color_continuous_scale=["#238636","#3fb950","#56d364"])
+        st.plotly_chart(sty(fig3),use_container_width=True,theme=None)
+    with c4:
+        dc=df["assigned_to"].value_counts().reset_index(); dc.columns=["Department","Count"]
+        fig4=px.bar(dc,x="Department",y="Count",title="Complaints Assigned To (Action Teams)",color="Count",color_continuous_scale=["#1f6feb","#58a6ff","#79c0ff"])
         st.plotly_chart(sty(fig4),use_container_width=True,theme=None)
+
+    c5,c6=st.columns(2)
+    with c5:
+        if "reporter_dept" in df.columns:
+            rdc=df["reporter_dept"].value_counts().reset_index(); rdc.columns=["ReporterDept","Count"]
+            fig5=px.bar(rdc,x="ReporterDept",y="Count",title="Complaints Received From Depts (Scientists)",color="Count",color_continuous_scale=["#8957e5","#d2a8ff"])
+            st.plotly_chart(sty(fig5),use_container_width=True,theme=None)
     fbs=all_feedback()
     if fbs:
         fb_df=pd.DataFrame(fbs); avg=fb_df["rating"].astype(float).mean()
