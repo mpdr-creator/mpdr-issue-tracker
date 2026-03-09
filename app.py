@@ -115,7 +115,33 @@ DEPT_EMAILS = {
     "Safety":          "admin@morepenpdr.com",
 }
 
-ARES_TABLE_HTML = """<div class="info-card" style="margin-top:1rem; margin-bottom:1rem;"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">🏢 AREs - Admin Representative Employees</p>
+def get_ares():
+    ws = get_or_create_sheet("ares", ["Category", "Name", "Responsibility", "Email", "Phone", "Icon"])
+    recs = ws.get_all_records()
+    if not recs:
+        initial = [
+            ["Lab Maintenance", "Manisha", "Equipment", "admin@morepenpdr.com", "6300535593", "🧪"],
+            ["IT", "Narendra", "Software, network", "narendra.s@morepenpdr.com", "8106107921", "🖥️"],
+            ["Safety", "Narendra", "Hazards, compliance", "narendra.s@morepenpdr.com", "8106107921", "⚠️"],
+            ["HR", "Nikhitha", "HR matters", "hr@morepenpdr.com", "6302451459", "👥"]
+        ]
+        for row in initial: ws.append_row(row)
+        recs = ws.get_all_records()
+    return recs
+
+def render_ares_table():
+    recs = get_ares()
+    rows_html = ""
+    for r in recs:
+        rows_html += f"""<tr style="border-bottom:1px solid #e8f4ff;">
+      <td style="padding:4px; color:#0d2d5e; font-weight:600;">{r.get('Icon','')} {r.get('Category','')}</td>
+      <td style="padding:4px; color:#0d2d5e;">{r.get('Name','')}</td>
+      <td style="padding:4px; color:#8b949e;">{r.get('Responsibility','')}</td>
+      <td style="padding:4px; color:#58a6ff;">{r.get('Email','')}</td>
+      <td style="padding:4px; color:#8b949e;">{str(r.get('Phone',''))}</td>
+    </tr>"""
+        
+    return f"""<div class="info-card" style="margin-top:1rem; margin-bottom:1rem;"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">🏢 AREs - Admin Representative Employees</p>
 <div style="overflow-x:auto;">
 <table style="width:100%; border-collapse:collapse; font-size:0.8rem; text-align:left;">
   <thead>
@@ -128,34 +154,7 @@ ARES_TABLE_HTML = """<div class="info-card" style="margin-top:1rem; margin-botto
     </tr>
   </thead>
   <tbody>
-    <tr style="border-bottom:1px solid #e8f4ff;">
-      <td style="padding:4px; color:#0d2d5e; font-weight:600;">🧪 Lab Maintenance</td>
-      <td style="padding:4px; color:#0d2d5e;">Manisha</td>
-      <td style="padding:4px; color:#8b949e;">Equipment</td>
-      <td style="padding:4px; color:#58a6ff;">admin@morepenpdr.com</td>
-      <td style="padding:4px; color:#8b949e;">6300535593</td>
-    </tr>
-    <tr style="border-bottom:1px solid #e8f4ff;">
-      <td style="padding:4px; color:#0d2d5e; font-weight:600;">🖥️ IT</td>
-      <td style="padding:4px; color:#0d2d5e;">Narendra</td>
-      <td style="padding:4px; color:#8b949e;">Software, network</td>
-      <td style="padding:4px; color:#58a6ff;">narendra.s@morepenpdr.com</td>
-      <td style="padding:4px; color:#8b949e;">8106107921</td>
-    </tr>
-    <tr style="border-bottom:1px solid #e8f4ff;">
-      <td style="padding:4px; color:#0d2d5e; font-weight:600;">⚠️ Safety</td>
-      <td style="padding:4px; color:#0d2d5e;">Narendra</td>
-      <td style="padding:4px; color:#8b949e;">Hazards, compliance</td>
-      <td style="padding:4px; color:#58a6ff;">narendra.s@morepenpdr.com</td>
-      <td style="padding:4px; color:#8b949e;">8106107921</td>
-    </tr>
-    <tr>
-      <td style="padding:4px; color:#0d2d5e; font-weight:600;">👥 HR</td>
-      <td style="padding:4px; color:#0d2d5e;">Nikhitha</td>
-      <td style="padding:4px; color:#8b949e;">HR matters</td>
-      <td style="padding:4px; color:#58a6ff;">hr@morepenpdr.com</td>
-      <td style="padding:4px; color:#8b949e;">6302451459</td>
-    </tr>
+    {rows_html}
   </tbody>
 </table>
 </div></div>"""
@@ -281,6 +280,45 @@ def update_ticket(tid,status,notes=""):
     if status=="RESOLVED":
         t["resolution_notes"]=notes; t["updated_at"]=now; email_resolved(t)
     log_ticket_history(tid, old_status, status, st.session_state.get("email","System"), notes)
+
+def email_reassigned(t, old_email, new_email, changed_by):
+    subj = f"[MPDR] 🔄 Ticket #{t['ticket_id'][:8].upper()} Re-assigned"
+    html = f"""<div style="font-family:Arial,sans-serif;background:#0d1117;color:#e6edf3;padding:30px;border-radius:12px;max-width:600px;margin:0 auto;">
+<div style="text-align:center;margin-bottom:24px;"><div style="font-size:2rem;">🔄</div>
+<h2 style="color:#58a6ff;margin:8px 0 4px 0;">Ticket Re-assignment</h2>
+<p style="color:#8b949e;font-size:0.85rem;margin:0;">Ticket ID: #{t['ticket_id'][:8].upper()}</p></div>
+<div style="background:#161b22;border:1px solid #21262d;border-left:4px solid #f0a500;border-radius:10px;padding:20px;margin-bottom:16px;">
+<p style="color:#e6edf3;margin:0;line-height:1.6;font-size:1.05rem;">
+<strong>{changed_by}</strong> allotted this task to <strong>{new_email}</strong> from <strong>{old_email}</strong>.
+</p>
+</div>
+<p style="color:#8b949e;font-size:0.8rem;text-align:center;">Login to MPDR Issue Tracker to manage this ticket.</p></div>"""
+    
+    recipients = list(set([t.get('created_by'), old_email, new_email, changed_by]))
+    recipients = [r for r in recipients if r]
+    send_email(recipients, subj, html)
+
+def reassign_ticket(tid, new_email, changed_by):
+    ws,row,t=find_row(tid)
+    if not row: return
+    
+    headers = ws.row_values(1)
+    if "assigned_email" not in headers:
+        ws.update_cell(1, len(headers)+1, "assigned_email")
+        col_idx = len(headers)+1
+    else:
+        col_idx = headers.index("assigned_email") + 1
+        
+    old_email = t.get("assigned_email", "")
+    if not old_email:
+        old_email = DEPT_EMAILS.get(t.get("assigned_to",""), "Unassigned")
+        
+    if old_email == new_email: return
+    
+    ws.update_cell(row, col_idx, new_email)
+    log_ticket_history(tid, t.get("status",""), t.get("status",""), changed_by, f"Reassigned to {new_email}")
+    t["assigned_email"] = new_email
+    email_reassigned(t, old_email, new_email, changed_by)
 
 @st.cache_data(ttl=60, show_spinner=False)
 def all_feedback():
@@ -693,7 +731,8 @@ def page_dashboard():
     with c: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#f0a500;">{ip}</div><div class="stat-label">In Progress</div></div>',unsafe_allow_html=True)
     with d: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#3fb950;">{rn}</div><div class="stat-label">Resolved</div></div>',unsafe_allow_html=True)
     with e: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff4444;">{cr}</div><div class="stat-label">Critical</div></div>',unsafe_allow_html=True)
-    st.markdown("<br>" + ARES_TABLE_HTML,unsafe_allow_html=True)
+    st.markdown("<br>" + render_ares_table(),unsafe_allow_html=True)
+
     BG="#161b22"; FC="#e6edf3"; GC="#21262d"
     def sty(fig):
         fig.update_layout(paper_bgcolor=BG,plot_bgcolor=BG,font_color=FC,title_font_color="#58a6ff",title_font_size=14,margin=dict(t=40,b=20,l=20,r=20),legend=dict(bgcolor=BG,bordercolor=GC))
@@ -703,21 +742,21 @@ def page_dashboard():
         sc=df["status"].value_counts().reset_index(); sc.columns=["Status","Count"]
         cm={"OPEN":"#58a6ff","ASSIGNED":"#f0a500","IN_PROGRESS":"#3fb950","RESOLVED":"#56d364","CLOSED":"#8b949e"}
         fig=px.pie(sc,values="Count",names="Status",title="Tickets by Status",color="Status",color_discrete_map=cm,hole=0.45)
-        fig.update_traces(textfont_color=FC); st.plotly_chart(sty(fig),use_container_width=True)
+        fig.update_traces(textfont_color=FC); st.plotly_chart(sty(fig),use_container_width=True,theme=None)
     with c2:
         dc=df["assigned_to"].value_counts().reset_index(); dc.columns=["Department","Count"]
         fig2=px.bar(dc,x="Department",y="Count",title="Tickets by Department",color="Count",color_continuous_scale=["#1f6feb","#58a6ff","#79c0ff"])
-        st.plotly_chart(sty(fig2),use_container_width=True)
+        st.plotly_chart(sty(fig2),use_container_width=True,theme=None)
     c1,c2=st.columns(2)
     with c1:
         cc=df["category"].value_counts().reset_index(); cc.columns=["Category","Count"]
         fig3=px.bar(cc,x="Count",y="Category",orientation="h",title="Top Issue Categories",color="Count",color_continuous_scale=["#238636","#3fb950","#56d364"])
-        st.plotly_chart(sty(fig3),use_container_width=True)
+        st.plotly_chart(sty(fig3),use_container_width=True,theme=None)
     with c2:
         pc=df["priority"].value_counts().reset_index(); pc.columns=["Priority","Count"]
         pcm={"Low":"#3fb950","Medium":"#f0a500","High":"#ff7b72","Critical":"#ff4444"}
         fig4=px.bar(pc,x="Priority",y="Count",title="Tickets by Priority",color="Priority",color_discrete_map=pcm)
-        st.plotly_chart(sty(fig4),use_container_width=True)
+        st.plotly_chart(sty(fig4),use_container_width=True,theme=None)
     fbs=all_feedback()
     if fbs:
         fb_df=pd.DataFrame(fbs); avg=fb_df["rating"].astype(float).mean()
@@ -740,7 +779,7 @@ def page_dashboard():
             res_avg = res_df.groupby("assigned_to")["res_hours"].mean().reset_index()
             res_avg.columns = ["Department", "Avg Hours"]
             fig5=px.bar(res_avg,x="Department",y="Avg Hours",title="Avg Resolution Time (hrs)",color="Avg Hours",color_continuous_scale=["#3fb950","#f0a500","#ff7b72"])
-            st.plotly_chart(sty(fig5),use_container_width=True)
+            st.plotly_chart(sty(fig5),use_container_width=True,theme=None)
         else:
             st.info("Not enough data for Resolution Time chart.")
     with c2:
@@ -749,7 +788,7 @@ def page_dashboard():
             b_counts = breach_df["assigned_to"].value_counts().reset_index()
             b_counts.columns = ["Department", "Breaches"]
             fig6=px.bar(b_counts,x="Department",y="Breaches",title="SLA Breaches by Dept",color="Breaches",color_continuous_scale=["#ff4444","#e53935","#b71c1c"])
-            st.plotly_chart(sty(fig6),use_container_width=True)
+            st.plotly_chart(sty(fig6),use_container_width=True,theme=None)
         else:
             st.info("✅ No SLA Breaches!")
 
@@ -765,6 +804,40 @@ def page_dashboard():
 <div><div style="font-size:1.8rem;font-weight:700;color:#f0a500;">{len(at_risk)}</div><div style="color:#8b949e;font-size:0.78rem;">At Risk</div></div>
 <div><div style="font-size:1.8rem;font-weight:700;color:#3fb950;">{compliance:.0f}%</div><div style="color:#8b949e;font-size:0.78rem;">Compliance</div></div>
 </div></div>""",unsafe_allow_html=True)
+
+def page_manage_ares():
+    st.markdown('<div class="page-header"><div class="page-title">🏢 Manage AREs</div><div class="page-sub">Add, edit, or remove Admin Representative Employees</div></div>',unsafe_allow_html=True)
+    recs = get_ares()
+    df = pd.DataFrame(recs)
+    
+    st.info("💡 You can edit cells directly. Click empty rows at the bottom to add new members, or select rows and press delete to remove them.")
+    
+    edited_df = st.data_editor(
+        df,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "Category": st.column_config.TextColumn("Category (e.g. IT, HR)", required=True),
+            "Name": st.column_config.TextColumn("Name", required=True),
+            "Responsibility": st.column_config.TextColumn("Responsibility", required=True),
+            "Email": st.column_config.TextColumn("Valid e-mail", required=True),
+            "Phone": st.column_config.TextColumn("Phone Number", required=True),
+            "Icon": st.column_config.TextColumn("Emoji Title Icon (e.g. 🧪)")
+        }
+    )
+    
+    if st.button("💾 Save AREs Data"):
+        with st.spinner("Saving changes..."):
+            client = get_client().open("MPDR Issue Tracker")
+            ws = client.worksheet("ares")
+            ws.clear()
+            headers = edited_df.columns.tolist()
+            ws.append_row(headers)
+            values = edited_df.fillna("").values.tolist()
+            if values:
+                ws.append_rows(values)
+            st.success("✅ AREs directory updated successfully! The new data is now live.")
+            st.rerun()
 
 def page_all_tickets():
     st.markdown('<div class="page-header"><div class="page-title">📋 All Tickets</div><div class="page-sub">Complete view of every ticket in the system</div></div>',unsafe_allow_html=True)
@@ -790,12 +863,36 @@ def page_all_tickets():
     
     with t1:
         if active_t:
-            disp=pd.DataFrame(active_t)[["ticket_id","title","category","priority","status","assigned_to","created_by","created_at"]].copy()
-            disp["ticket_id"]=disp["ticket_id"].str[:8].str.upper()
-            disp.columns=["ID","Title","Category","Priority","Status","Department","Reporter","Created"]
-            st.dataframe(disp,use_container_width=True,hide_index=True)
+            for t in reversed(active_t):
+                with st.expander(f"#{t['ticket_id'][:8].upper()} - {t['title']} ({t['status']})"):
+                    st.markdown(f"**Priority:** {pb(t['priority'])} &nbsp;|&nbsp; **Category:** {t['category']} &nbsp;|&nbsp; **Department:** {t['assigned_to']} &nbsp;|&nbsp; **Reporter:** {t['created_by']}", unsafe_allow_html=True)
+                    st.write(t['description'])
+                    
+                    st.markdown("---")
+                    users = all_users()
+                    user_emails = [u["email"] for u in users]
+                    current_assignee = t.get("assigned_email", "")
+                    
+                    opts = ["Select a user..."] + user_emails
+                    def_idx = opts.index(current_assignee) if current_assignee in opts else 0
+                    
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        new_assignee = st.selectbox("🔄 Re-Allot Ticket to:", opts, index=def_idx, key=f"reassign_{t['ticket_id']}")
+                    with col2:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        if st.button("Re-assign", key=f"btn_reassign_{t['ticket_id']}"):
+                            if new_assignee != "Select a user..." and new_assignee != current_assignee:
+                                with st.spinner("Re-assigning..."):
+                                    reassign_ticket(t["ticket_id"], new_assignee, st.session_state.email)
+                                st.success("Ticket reassigned successfully!")
+                                st.rerun()
+                            elif new_assignee == current_assignee:
+                                st.warning("Already assigned to this user.")
+                            else:
+                                st.warning("Please select a valid user.")
         else:
-            st.info("No tickets found in this category.")
+            st.info("No active tickets found in this category.")
             
     with t2:
         if res_t:
@@ -835,6 +932,7 @@ def main():
     elif role=="management":
         if page in ("home","dashboard","login"): page_dashboard()
         elif page=="all_tickets":                page_all_tickets()
+        elif page=="manage_ares":                page_manage_ares()
         else:                                    page_dashboard()
 
 if __name__=="__main__":
