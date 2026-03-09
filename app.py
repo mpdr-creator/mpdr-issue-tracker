@@ -5,7 +5,13 @@ import bcrypt
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# Indian Standard Time (UTC+5:30)
+IST = timezone(timedelta(hours=5, minutes=30))
+def now_ist():
+    """Return current datetime in Indian Standard Time."""
+    return datetime.now(IST)
 import uuid
 import plotly.express as px
 import pandas as pd
@@ -130,7 +136,7 @@ def get_or_create_sheet(name, cols):
 def log_ticket_history(tid, old_status, new_status, by, notes=""):
     if old_status == new_status: return
     ws = get_or_create_sheet("ticket_history", ["ticket_id", "old_status", "new_status", "updated_by", "timestamp", "notes"])
-    ws.append_row([tid, old_status, new_status, by, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), notes])
+    ws.append_row([tid, old_status, new_status, by, now_ist().strftime("%Y-%m-%d %H:%M:%S"), notes])
 
 
 def send_email(to_list, subject, html_body):
@@ -203,7 +209,7 @@ def all_users():    return sheet("users").get_all_records()
 def get_user(e):    return next((u for u in all_users() if u["email"]==e), None)
 def register_user(email,password,role,dept=""):
     h = bcrypt.hashpw(password.encode(),bcrypt.gensalt()).decode()
-    sheet("users").append_row([email,h,role,dept,datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+    sheet("users").append_row([email,h,role,dept,now_ist().strftime("%Y-%m-%d %H:%M:%S")])
 def check_pw(pw,h): return bcrypt.checkpw(pw.encode(),h.encode())
 
 def all_tickets():  return sheet("tickets").get_all_records()
@@ -214,7 +220,7 @@ def find_row(tid):
     return None,None,None
 
 def create_ticket(title,desc,cat,prio,dept,creator):
-    tid=str(uuid.uuid4()); now=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    tid=str(uuid.uuid4()); now=now_ist().strftime("%Y-%m-%d %H:%M:%S")
     sheet("tickets").append_row([tid,title,desc,cat,prio,"OPEN",creator,dept,now,now,""])
     t=dict(ticket_id=tid,title=title,description=desc,category=cat,priority=prio,
            status="OPEN",created_by=creator,assigned_to=dept,created_at=now,updated_at=now,resolution_notes="")
@@ -223,7 +229,7 @@ def create_ticket(title,desc,cat,prio,dept,creator):
 def update_ticket(tid,status,notes=""):
     ws,row,t=find_row(tid)
     if not row: return
-    now=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now=now_ist().strftime("%Y-%m-%d %H:%M:%S")
     old_status = t["status"]
     ws.update_cell(row,6,status); ws.update_cell(row,10,now)
     if notes: ws.update_cell(row,11,notes)
@@ -241,7 +247,7 @@ def all_feedback():
 def has_fb(tid):      return any(f["ticket_id"]==tid for f in all_feedback())
 def submit_fb(tid,by,rating,comments):
     ws = get_or_create_sheet("feedback", ["ticket_id", "by", "rating", "comments", "timestamp"])
-    ws.append_row([tid,by,rating,comments,datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+    ws.append_row([tid,by,rating,comments,now_ist().strftime("%Y-%m-%d %H:%M:%S")])
     update_ticket(tid,"CLOSED")
     all_feedback.clear()
 
@@ -254,7 +260,7 @@ def all_ticket_comments():
 def add_ticket_comment(tid, user, comment):
     if not comment.strip(): return
     ws = get_or_create_sheet("ticket_comments", ["ticket_id", "user", "timestamp", "comment"])
-    ws.append_row([tid, user, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), comment])
+    ws.append_row([tid, user, now_ist().strftime("%Y-%m-%d %H:%M:%S"), comment])
 
 def render_comments_ui(t, all_comms):
     comms = [c for c in all_comms if c["ticket_id"] == t["ticket_id"]]
@@ -277,7 +283,7 @@ def get_sla_info(ticket):
     allowed=SLA_HOURS.get(ticket.get("priority"),72)
     try:
         created=datetime.strptime(ticket["created_at"],"%Y-%m-%d %H:%M:%S")
-        elapsed=(datetime.now()-created).total_seconds()/3600
+        elapsed=(now_ist().replace(tzinfo=None)-created).total_seconds()/3600
     except Exception:
         return {"status":"N/A","elapsed":0,"remaining":0,"pct":0}
     pct=min(elapsed/allowed*100,100)
@@ -334,7 +340,7 @@ def check_sla_warnings(_tickets):
             if sla["pct"] >= 75 and t["ticket_id"] not in sent_warnings:
                 if email_sla_warning(t):
                     try:
-                        warnings_ws.append_row([t["ticket_id"], datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+                        warnings_ws.append_row([t["ticket_id"], now_ist().strftime("%Y-%m-%d %H:%M:%S")])
                         sent_warnings.append(t["ticket_id"])
                         new_warnings = True
                     except Exception:
@@ -455,8 +461,50 @@ def page_create():
 <div style="margin-bottom:8px;"><span class="badge b-high">High</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Major impact on work</span></div>
 <div style="margin-bottom:8px;"><span class="badge b-medium">Medium</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Moderate disruption</span></div>
 <div><span class="badge b-low">Low</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Minor / non-urgent</span></div></div>
-<div class="info-card" style="margin-top:1rem;"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">🏢 Departments</p>
-<div style="color:#8b949e;font-size:0.85rem;line-height:2;">🖥️ <b style="color:#0d2d5e;">IT</b> — Software, network<br>🧪 <b style="color:#0d2d5e;">Lab Maintenance</b> — Equipment<br>👥 <b style="color:#0d2d5e;">HR</b> — HR matters<br>⚠️ <b style="color:#0d2d5e;">Safety</b> — Hazards, compliance</div></div>""",unsafe_allow_html=True)
+<div class="info-card" style="margin-top:1rem;"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">🏢 AREs - Admin Representative Employees</p>
+<div style="overflow-x:auto;">
+<table style="width:100%; border-collapse:collapse; font-size:0.8rem; text-align:left;">
+  <thead>
+    <tr style="border-bottom:1px solid #c8e3ff; color:#4a7ab5;">
+      <th style="padding:4px;">Category</th>
+      <th style="padding:4px;">Name</th>
+      <th style="padding:4px;">Responsibility</th>
+      <th style="padding:4px;">e-mail</th>
+      <th style="padding:4px;">Ph. No.</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom:1px solid #e8f4ff;">
+      <td style="padding:4px; color:#0d2d5e; font-weight:600;">🧪 Lab Maintenance</td>
+      <td style="padding:4px; color:#0d2d5e;">Manisha</td>
+      <td style="padding:4px; color:#8b949e;">Equipment</td>
+      <td style="padding:4px; color:#58a6ff;">admin@morepenpdr.com</td>
+      <td style="padding:4px; color:#8b949e;">6300535593</td>
+    </tr>
+    <tr style="border-bottom:1px solid #e8f4ff;">
+      <td style="padding:4px; color:#0d2d5e; font-weight:600;">🖥️ IT</td>
+      <td style="padding:4px; color:#0d2d5e;">Narendra</td>
+      <td style="padding:4px; color:#8b949e;">Software, network</td>
+      <td style="padding:4px; color:#58a6ff;">narendra.s@morepenpdr.com</td>
+      <td style="padding:4px; color:#8b949e;">8106107921</td>
+    </tr>
+    <tr style="border-bottom:1px solid #e8f4ff;">
+      <td style="padding:4px; color:#0d2d5e; font-weight:600;">⚠️ Safety</td>
+      <td style="padding:4px; color:#0d2d5e;">Narendra</td>
+      <td style="padding:4px; color:#8b949e;">Hazards, compliance</td>
+      <td style="padding:4px; color:#58a6ff;">narendra.s@morepenpdr.com</td>
+      <td style="padding:4px; color:#8b949e;">8106107921</td>
+    </tr>
+    <tr>
+      <td style="padding:4px; color:#0d2d5e; font-weight:600;">👥 HR</td>
+      <td style="padding:4px; color:#0d2d5e;">Nikhitha</td>
+      <td style="padding:4px; color:#8b949e;">HR matters</td>
+      <td style="padding:4px; color:#58a6ff;">hr@morepenpdr.com</td>
+      <td style="padding:4px; color:#8b949e;">6302451459</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>""",unsafe_allow_html=True)
 
 def page_my_tickets():
     st.markdown('<div class="page-header"><div class="page-title">📋 My Tickets</div><div class="page-sub">Track all issues you have reported</div></div>',unsafe_allow_html=True)
