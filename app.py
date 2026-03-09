@@ -115,6 +115,51 @@ DEPT_EMAILS = {
     "Safety":          "admin@morepenpdr.com",
 }
 
+ARES_TABLE_HTML = """<div class="info-card" style="margin-top:1rem; margin-bottom:1rem;"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">🏢 AREs - Admin Representative Employees</p>
+<div style="overflow-x:auto;">
+<table style="width:100%; border-collapse:collapse; font-size:0.8rem; text-align:left;">
+  <thead>
+    <tr style="border-bottom:1px solid #c8e3ff; color:#4a7ab5;">
+      <th style="padding:4px;">Category</th>
+      <th style="padding:4px;">Name</th>
+      <th style="padding:4px;">Responsibility</th>
+      <th style="padding:4px;">e-mail</th>
+      <th style="padding:4px;">Ph. No.</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom:1px solid #e8f4ff;">
+      <td style="padding:4px; color:#0d2d5e; font-weight:600;">🧪 Lab Maintenance</td>
+      <td style="padding:4px; color:#0d2d5e;">Manisha</td>
+      <td style="padding:4px; color:#8b949e;">Equipment</td>
+      <td style="padding:4px; color:#58a6ff;">admin@morepenpdr.com</td>
+      <td style="padding:4px; color:#8b949e;">6300535593</td>
+    </tr>
+    <tr style="border-bottom:1px solid #e8f4ff;">
+      <td style="padding:4px; color:#0d2d5e; font-weight:600;">🖥️ IT</td>
+      <td style="padding:4px; color:#0d2d5e;">Narendra</td>
+      <td style="padding:4px; color:#8b949e;">Software, network</td>
+      <td style="padding:4px; color:#58a6ff;">narendra.s@morepenpdr.com</td>
+      <td style="padding:4px; color:#8b949e;">8106107921</td>
+    </tr>
+    <tr style="border-bottom:1px solid #e8f4ff;">
+      <td style="padding:4px; color:#0d2d5e; font-weight:600;">⚠️ Safety</td>
+      <td style="padding:4px; color:#0d2d5e;">Narendra</td>
+      <td style="padding:4px; color:#8b949e;">Hazards, compliance</td>
+      <td style="padding:4px; color:#58a6ff;">narendra.s@morepenpdr.com</td>
+      <td style="padding:4px; color:#8b949e;">8106107921</td>
+    </tr>
+    <tr>
+      <td style="padding:4px; color:#0d2d5e; font-weight:600;">👥 HR</td>
+      <td style="padding:4px; color:#0d2d5e;">Nikhitha</td>
+      <td style="padding:4px; color:#8b949e;">HR matters</td>
+      <td style="padding:4px; color:#58a6ff;">hr@morepenpdr.com</td>
+      <td style="padding:4px; color:#8b949e;">6302451459</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>"""
+
 # Status transitions
 ALLOWED_TRANSITIONS = {
     "OPEN": ["ASSIGNED"],
@@ -460,51 +505,7 @@ def page_create():
 <div style="margin-bottom:8px;"><span class="badge b-critical">Critical</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Safety risk / production stopped</span></div>
 <div style="margin-bottom:8px;"><span class="badge b-high">High</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Major impact on work</span></div>
 <div style="margin-bottom:8px;"><span class="badge b-medium">Medium</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Moderate disruption</span></div>
-<div><span class="badge b-low">Low</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Minor / non-urgent</span></div></div>
-<div class="info-card" style="margin-top:1rem;"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">🏢 AREs - Admin Representative Employees</p>
-<div style="overflow-x:auto;">
-<table style="width:100%; border-collapse:collapse; font-size:0.8rem; text-align:left;">
-  <thead>
-    <tr style="border-bottom:1px solid #c8e3ff; color:#4a7ab5;">
-      <th style="padding:4px;">Category</th>
-      <th style="padding:4px;">Name</th>
-      <th style="padding:4px;">Responsibility</th>
-      <th style="padding:4px;">e-mail</th>
-      <th style="padding:4px;">Ph. No.</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr style="border-bottom:1px solid #e8f4ff;">
-      <td style="padding:4px; color:#0d2d5e; font-weight:600;">🧪 Lab Maintenance</td>
-      <td style="padding:4px; color:#0d2d5e;">Manisha</td>
-      <td style="padding:4px; color:#8b949e;">Equipment</td>
-      <td style="padding:4px; color:#58a6ff;">admin@morepenpdr.com</td>
-      <td style="padding:4px; color:#8b949e;">6300535593</td>
-    </tr>
-    <tr style="border-bottom:1px solid #e8f4ff;">
-      <td style="padding:4px; color:#0d2d5e; font-weight:600;">🖥️ IT</td>
-      <td style="padding:4px; color:#0d2d5e;">Narendra</td>
-      <td style="padding:4px; color:#8b949e;">Software, network</td>
-      <td style="padding:4px; color:#58a6ff;">narendra.s@morepenpdr.com</td>
-      <td style="padding:4px; color:#8b949e;">8106107921</td>
-    </tr>
-    <tr style="border-bottom:1px solid #e8f4ff;">
-      <td style="padding:4px; color:#0d2d5e; font-weight:600;">⚠️ Safety</td>
-      <td style="padding:4px; color:#0d2d5e;">Narendra</td>
-      <td style="padding:4px; color:#8b949e;">Hazards, compliance</td>
-      <td style="padding:4px; color:#58a6ff;">narendra.s@morepenpdr.com</td>
-      <td style="padding:4px; color:#8b949e;">8106107921</td>
-    </tr>
-    <tr>
-      <td style="padding:4px; color:#0d2d5e; font-weight:600;">👥 HR</td>
-      <td style="padding:4px; color:#0d2d5e;">Nikhitha</td>
-      <td style="padding:4px; color:#8b949e;">HR matters</td>
-      <td style="padding:4px; color:#58a6ff;">hr@morepenpdr.com</td>
-      <td style="padding:4px; color:#8b949e;">6302451459</td>
-    </tr>
-  </tbody>
-</table>
-</div></div>""",unsafe_allow_html=True)
+<div><span class="badge b-low">Low</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Minor / non-urgent</span></div></div>""" + ARES_TABLE_HTML,unsafe_allow_html=True)
 
 def page_my_tickets():
     st.markdown('<div class="page-header"><div class="page-title">📋 My Tickets</div><div class="page-sub">Track all issues you have reported</div></div>',unsafe_allow_html=True)
@@ -569,7 +570,7 @@ def page_dept():
     with b: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff4444;">{cn}</div><div class="stat-label">Critical</div></div>',unsafe_allow_html=True)
     with c: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff7b72;">{hn}</div><div class="stat-label">High</div></div>',unsafe_allow_html=True)
 
-    st.markdown("<br>",unsafe_allow_html=True)
+    st.markdown("<br>" + ARES_TABLE_HTML,unsafe_allow_html=True)
     po={"Critical":0,"High":1,"Medium":2,"Low":3}
     tickets=sorted(tickets,key=lambda x:po.get(x["priority"],4))
     c1,c2=st.columns(2)
@@ -653,7 +654,7 @@ def page_dashboard():
     with c: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#f0a500;">{ip}</div><div class="stat-label">In Progress</div></div>',unsafe_allow_html=True)
     with d: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#3fb950;">{rn}</div><div class="stat-label">Resolved</div></div>',unsafe_allow_html=True)
     with e: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff4444;">{cr}</div><div class="stat-label">Critical</div></div>',unsafe_allow_html=True)
-    st.markdown("<br>",unsafe_allow_html=True)
+    st.markdown("<br>" + ARES_TABLE_HTML,unsafe_allow_html=True)
     BG="#161b22"; FC="#e6edf3"; GC="#21262d"
     def sty(fig):
         fig.update_layout(paper_bgcolor=BG,plot_bgcolor=BG,font_color=FC,title_font_color="#58a6ff",title_font_size=14,margin=dict(t=40,b=20,l=20,r=20),legend=dict(bgcolor=BG,bordercolor=GC))
