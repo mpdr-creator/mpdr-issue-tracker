@@ -115,9 +115,29 @@ DEPT_EMAILS = {
     "Safety":          "admin@morepenpdr.com",
 }
 
+def safe_get_all_records(ws):
+    """Robust version of get_all_records to handle duplicate or empty headers."""
+    all_values = ws.get_all_values()
+    if not all_values:
+        return []
+    headers = [h.strip() for h in all_values[0]]
+    # Filter out records where valid headers are present
+    valid_header_indices = [i for i, h in enumerate(headers) if h]
+    clean_headers = [headers[i] for i in valid_header_indices]
+    
+    data = []
+    for row in all_values[1:]:
+        if any(row): # Skip truly empty rows
+            record = {}
+            for i, h_name in enumerate(clean_headers):
+                idx = valid_header_indices[i]
+                record[h_name] = row[idx] if idx < len(row) else ""
+            data.append(record)
+    return data
+
 def get_ares():
     ws = get_or_create_sheet("ares", ["Category", "Name", "Responsibility", "Email", "Phone", "Icon"])
-    recs = ws.get_all_records()
+    recs = safe_get_all_records(ws)
     if not recs:
         initial = [
             ["Lab Maintenance", "Manisha", "Equipment", "admin@morepenpdr.com", "6300535593", "🧪"],
@@ -249,16 +269,16 @@ def email_resolved(t):
 <p style="color:#8b949e;font-size:0.8rem;text-align:center;">MPDR Issue Tracker · Morepen Laboratories</p></div>"""
     send_email(t['created_by'], subj, html)
 
-def all_users():    return sheet("users").get_all_records()
+def all_users():    return safe_get_all_records(sheet("users"))
 def get_user(e):    return next((u for u in all_users() if u["email"]==e), None)
 def register_user(email,password,role,dept=""):
     h = bcrypt.hashpw(password.encode(),bcrypt.gensalt()).decode()
     sheet("users").append_row([email,h,role,dept,now_ist().strftime("%Y-%m-%d %H:%M:%S")])
 def check_pw(pw,h): return bcrypt.checkpw(pw.encode(),h.encode())
 
-def all_tickets():  return sheet("tickets").get_all_records()
+def all_tickets():  return safe_get_all_records(sheet("tickets"))
 def find_row(tid):
-    ws=sheet("tickets"); recs=ws.get_all_records()
+    ws=sheet("tickets"); recs=safe_get_all_records(ws)
     for i,r in enumerate(recs,start=2):
         if r["ticket_id"]==tid: return ws,i,r
     return None,None,None
@@ -323,7 +343,8 @@ def reassign_ticket(tid, new_email, changed_by):
 @st.cache_data(ttl=60, show_spinner=False)
 def all_feedback():
     try:
-        return get_or_create_sheet("feedback", ["ticket_id", "by", "rating", "comments", "timestamp"]).get_all_records()
+        ws = get_or_create_sheet("feedback", ["ticket_id", "by", "rating", "comments", "timestamp"])
+        return safe_get_all_records(ws)
     except Exception:
         return []
 
@@ -336,7 +357,8 @@ def submit_fb(tid,by,rating,comments):
 
 def all_ticket_comments():
     try:
-        return get_or_create_sheet("ticket_comments", ["ticket_id", "user", "timestamp", "comment"]).get_all_records()
+        ws = get_or_create_sheet("ticket_comments", ["ticket_id", "user", "timestamp", "comment"])
+        return safe_get_all_records(ws)
     except Exception:
         return []
 
@@ -412,7 +434,8 @@ def email_sla_warning(t):
 def check_sla_warnings(_tickets):
     try:
         warnings_ws = get_or_create_sheet("sla_warnings", ["ticket_id", "timestamp"])
-        sent_warnings = [r["ticket_id"] for r in warnings_ws.get_all_records()]
+        recs = safe_get_all_records(warnings_ws)
+        sent_warnings = [r["ticket_id"] for r in recs if r.get("ticket_id")]
     except Exception:
         sent_warnings = []
     
