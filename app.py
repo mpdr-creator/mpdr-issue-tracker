@@ -97,33 +97,13 @@ button[data-testid="baseButton-headerNoPadding"] span { visibility:hidden !impor
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"]
 
-def _build_client():
-    creds = Credentials.from_service_account_info(dict(st.secrets["gcp_service_account"]), scopes=SCOPES)
-    return gspread.Client(auth=creds)
-
 @st.cache_resource(show_spinner=False)
 def get_client():
-    return _build_client()
+    creds = Credentials.from_service_account_info(dict(st.secrets["gcp_service_account"]), scopes=SCOPES)
+    return gspread.authorize(creds)
 
-def _refresh_client():
-    """Force-rebuild the gspread client and update the cache."""
-    get_client.clear()
-    new_client = _build_client()
-    # Repopulate the cache with the fresh client
-    get_client.__wrapped__ = lambda: new_client
-    return new_client
-
-def sheet(tab, _client=None):
-    """Return a worksheet, auto-refreshing the client on auth errors."""
-    client = _client or get_client()
-    try:
-        return client.open("MPDR Issue Tracker").worksheet(tab)
-    except gspread.exceptions.APIError as e:
-        if e.response.status_code in (401, 403):
-            get_client.clear()
-            client = get_client()
-            return client.open("MPDR Issue Tracker").worksheet(tab)
-        raise
+def sheet(tab):
+    return get_client().open("MPDR Issue Tracker").worksheet(tab)
 
 NOTIFY_EMAILS = ["admin@morepenpdr.com","mpdr.services@gmail.com"]
 
@@ -191,11 +171,7 @@ ALLOWED_TRANSITIONS = {
 SLA_HOURS = {"Critical": 4, "High": 24, "Medium": 72, "Low": 168}
 
 def get_or_create_sheet(name, cols):
-    try:
-        client = get_client().open("MPDR Issue Tracker")
-    except gspread.exceptions.GSpreadException:
-        get_client.clear()
-        client = get_client().open("MPDR Issue Tracker")
+    client = get_client().open("MPDR Issue Tracker")
     if name not in [ws.title for ws in client.worksheets()]:
         ws = client.add_worksheet(title=name, rows=1000, cols=len(cols))
         ws.append_row(cols)
@@ -280,15 +256,7 @@ def register_user(email,password,role,dept=""):
     sheet("users").append_row([email,h,role,dept,now_ist().strftime("%Y-%m-%d %H:%M:%S")])
 def check_pw(pw,h): return bcrypt.checkpw(pw.encode(),h.encode())
 
-def all_tickets():
-    try:
-        return sheet("tickets").get_all_records()
-    except gspread.exceptions.GSpreadException:
-        get_client.clear()
-        try:
-            return sheet("tickets").get_all_records()
-        except gspread.exceptions.GSpreadException:
-            return []
+def all_tickets():  return sheet("tickets").get_all_records()
 def find_row(tid):
     ws=sheet("tickets"); recs=ws.get_all_records()
     for i,r in enumerate(recs,start=2):
