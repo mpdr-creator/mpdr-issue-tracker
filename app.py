@@ -757,7 +757,7 @@ def page_dashboard():
         st.plotly_chart(sty(fig3),use_container_width=True,theme=None)
     with c4:
         dc=df["assigned_to"].value_counts().reset_index(); dc.columns=["Department","Count"]
-        fig4=px.bar(dc,x="Department",y="Count",title="Complaints Assigned To (Action Teams)",color="Count",color_continuous_scale=["#1f6feb","#58a6ff","#79c0ff"])
+        fig4=px.bar(dc,x="Department",y="Count",title="Assigned To (Action Teams)",color="Count",color_continuous_scale=["#1f6feb","#58a6ff","#79c0ff"])
         st.plotly_chart(sty(fig4),use_container_width=True,theme=None)
 
     c5,c6=st.columns(2)
