@@ -736,7 +736,7 @@ def page_dashboard():
 
     BG="#161b22"; FC="#e6edf3"; GC="#21262d"
     def sty(fig):
-        fig.update_layout(paper_bgcolor=BG,plot_bgcolor=BG,font_color=FC,title_font_color="#58a6ff",title_font_size=15,margin=dict(t=50,b=50,l=50,r=50),legend=dict(bgcolor=BG,bordercolor=GC))
+        fig.update_layout(paper_bgcolor=BG,plot_bgcolor=BG,font_color=FC,title_font_color="#58a6ff",title_font_size=15,margin=dict(t=50,b=50,l=150,r=50),legend=dict(bgcolor=BG,bordercolor=GC))
         fig.update_xaxes(gridcolor=GC,zerolinecolor=GC); fig.update_yaxes(gridcolor=GC,zerolinecolor=GC); return fig
     c1,c2=st.columns(2)
     with c1:
