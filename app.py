@@ -863,14 +863,14 @@ def page_all_tickets():
     
     with t1:
         if active_t:
+            users = all_users()
+            user_emails = [u["email"] for u in users]
             for t in reversed(active_t):
                 with st.expander(f"#{t['ticket_id'][:8].upper()} - {t['title']} ({t['status']})"):
                     st.markdown(f"**Priority:** {pb(t['priority'])} &nbsp;|&nbsp; **Category:** {t['category']} &nbsp;|&nbsp; **Department:** {t['assigned_to']} &nbsp;|&nbsp; **Reporter:** {t['created_by']}", unsafe_allow_html=True)
                     st.write(t['description'])
                     
                     st.markdown("---")
-                    users = all_users()
-                    user_emails = [u["email"] for u in users]
                     current_assignee = t.get("assigned_email", "")
                     
                     opts = ["Select a user..."] + user_emails
