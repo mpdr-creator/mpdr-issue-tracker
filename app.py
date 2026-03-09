@@ -501,11 +501,35 @@ def page_create():
                 dept_email = DEPT_EMAILS.get(dept, "admin@morepenpdr.com")
                 st.success(f"✅ **Ticket submitted!** ID: `#{tid[:8].upper()}` · Notification sent to {dept_email}")
     with c2:
-        st.markdown("""<div class="info-card"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">📌 Priority Guide</p>
-<div style="margin-bottom:8px;"><span class="badge b-critical">Critical</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Safety risk / production stopped</span></div>
-<div style="margin-bottom:8px;"><span class="badge b-high">High</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Major impact on work</span></div>
-<div style="margin-bottom:8px;"><span class="badge b-medium">Medium</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Moderate disruption</span></div>
-<div><span class="badge b-low">Low</span><span style="color:#8b949e;font-size:0.82rem;margin-left:8px;">Minor / non-urgent</span></div></div>""" + ARES_TABLE_HTML,unsafe_allow_html=True)
+        st.markdown("""<div class="info-card"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">📌 ATT - Acceptable Turn-around Time</p>
+<div style="overflow-x:auto;">
+<table style="width:100%; border-collapse:collapse; font-size:0.8rem; text-align:left;">
+  <thead>
+    <tr style="border-bottom:1px solid #c8e3ff; color:#4a7ab5;">
+      <th style="padding:4px;">Priority</th>
+      <th style="padding:4px;">Time</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom:1px solid #e8f4ff;">
+      <td style="padding:4px;"><span class="badge b-critical" style="background: darkred;">Critical</span></td>
+      <td style="padding:4px; color:#e6edf3;">24hrs</td>
+    </tr>
+    <tr style="border-bottom:1px solid #e8f4ff;">
+      <td style="padding:4px;"><span class="badge b-high" style="background: red;">High</span></td>
+      <td style="padding:4px; color:#e6edf3;">48hrs</td>
+    </tr>
+    <tr style="border-bottom:1px solid #e8f4ff;">
+      <td style="padding:4px;"><span class="badge b-medium" style="background: yellow; color: black;">Medium</span></td>
+      <td style="padding:4px; color:#e6edf3;">72hrs</td>
+    </tr>
+    <tr>
+      <td style="padding:4px;"><span class="badge b-low" style="background: green;">Low</span></td>
+      <td style="padding:4px; color:#e6edf3;">96hrs</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>""" + ARES_TABLE_HTML,unsafe_allow_html=True)
 
 def page_my_tickets():
     st.markdown('<div class="page-header"><div class="page-title">📋 My Tickets</div><div class="page-sub">Track all issues you have reported</div></div>',unsafe_allow_html=True)
