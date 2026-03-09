@@ -578,7 +578,7 @@ def page_create():
     </tr>
   </tbody>
 </table>
-</div></div>""" + ARES_TABLE_HTML,unsafe_allow_html=True)
+</div></div>""" + render_ares_table(),unsafe_allow_html=True)
 
 def page_my_tickets():
     st.markdown('<div class="page-header"><div class="page-title">📋 My Tickets</div><div class="page-sub">Track all issues you have reported</div></div>',unsafe_allow_html=True)
@@ -645,7 +645,7 @@ def page_dept():
     with b: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff4444;">{cn}</div><div class="stat-label">Critical</div></div>',unsafe_allow_html=True)
     with c: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff7b72;">{hn}</div><div class="stat-label">High</div></div>',unsafe_allow_html=True)
 
-    st.markdown("<br>" + ARES_TABLE_HTML,unsafe_allow_html=True)
+    st.markdown("<br>" + render_ares_table(),unsafe_allow_html=True)
     po={"Critical":0,"High":1,"Medium":2,"Low":3}
     tickets=sorted(tickets,key=lambda x:po.get(x["priority"],4))
     c1,c2=st.columns(2)
