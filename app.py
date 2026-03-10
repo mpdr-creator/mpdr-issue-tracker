@@ -110,9 +110,9 @@ NOTIFY_EMAILS = ["admin@morepenpdr.com","mpdr.services@gmail.com"]
 # Department → recipient email mapping
 DEPT_EMAILS = {
     "IT":              "narendra.s@morepenpdr.com",
-    "Lab Maintenance": "narendra.s@morepenpdr.com",
+    "Lab Maintenance": "admin@morepenpdr.com",
     "HR":              "hr@morepenpdr.com",
-    "Safety":          "admin@morepenpdr.com",
+    "Safety":          "narendra.s@morepenpdr.com",
 }
 
 def safe_get_all_records(ws):
@@ -280,7 +280,15 @@ def register_user(email,password,role,dept=""):
 def check_pw(pw,h): return bcrypt.checkpw(pw.encode(),h.encode())
 
 @st.cache_data(ttl=60, show_spinner=False)
-def all_tickets():  return safe_get_all_records(sheet("tickets"))
+def all_tickets():
+    recs = safe_get_all_records(sheet("tickets"))
+    seen, uniq = set(), []
+    for r in recs:
+        tid = r.get("ticket_id")
+        if tid and tid not in seen:
+            seen.add(tid)
+            uniq.append(r)
+    return uniq
 def find_row(tid):
     ws=sheet("tickets"); recs=safe_get_all_records(ws)
     for i,r in enumerate(recs,start=2):
