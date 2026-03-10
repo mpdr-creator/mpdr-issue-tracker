@@ -109,7 +109,7 @@ NOTIFY_EMAILS = ["admin@morepenpdr.com","mpdr.services@gmail.com"]
 
 # Department → recipient email mapping
 DEPT_EMAILS = {
-    "IT":              "admin@morepenpdr.com",
+    "IT":              "narendra.s@morepenpdr.com",
     "Lab Maintenance": "narendra.s@morepenpdr.com",
     "HR":              "hr@morepenpdr.com",
     "Safety":          "admin@morepenpdr.com",
