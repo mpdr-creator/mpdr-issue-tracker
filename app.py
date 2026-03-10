@@ -654,6 +654,16 @@ def page_my_tickets():
             fb=next((f for f in all_feedback() if f["ticket_id"]==t["ticket_id"]),None)
             if fb:
                 st.markdown(f"""<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px 12px;margin-top:-8px;margin-bottom:8px;"><span style="color:#8b949e;font-size:0.8rem;">Your feedback: </span><span style="font-size:1rem;">{st_stars(fb['rating'])}</span>{f'<span style="color:#8b949e;font-size:0.82rem;"> · {fb["comments"]}</span>' if fb.get("comments") else ""}</div>""",unsafe_allow_html=True)
+        
+        if t["status"] in ["RESOLVED", "CLOSED"]:
+            with st.expander(f"🔄 Re-raise Ticket — #{t['ticket_id'][:8].upper()}"):
+                st.markdown('<p style="color:#ff7b72;font-weight:600;">Issue not resolved?</p>',unsafe_allow_html=True)
+                st.write("If you feel the issue was not fully solved, you can re-raise this ticket.")
+                if st.button("Re-raise Ticket", key=f"rr_{t['ticket_id']}"):
+                    update_ticket(t["ticket_id"], "OPEN", "Re-raised by user")
+                    st.success("✅ Ticket re-raised successfully!")
+                    st.rerun()
+
         with st.expander("💬 View/Add Comments"):
             render_comments_ui(t, all_comms)
 
