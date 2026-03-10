@@ -135,6 +135,7 @@ def safe_get_all_records(ws):
             data.append(record)
     return data
 
+@st.cache_data(ttl=60, show_spinner=False)
 def get_ares():
     ws = get_or_create_sheet("ares", ["Category", "Name", "Responsibility", "Email", "Phone", "Icon"])
     recs = safe_get_all_records(ws)
@@ -269,13 +270,16 @@ def email_resolved(t):
 <p style="color:#8b949e;font-size:0.8rem;text-align:center;">MPDR Issue Tracker · Morepen Laboratories</p></div>"""
     send_email(t['created_by'], subj, html)
 
+@st.cache_data(ttl=60, show_spinner=False)
 def all_users():    return safe_get_all_records(sheet("users"))
 def get_user(e):    return next((u for u in all_users() if u["email"]==e), None)
 def register_user(email,password,role,dept=""):
     h = bcrypt.hashpw(password.encode(),bcrypt.gensalt()).decode()
     sheet("users").append_row([email,h,role,dept,now_ist().strftime("%Y-%m-%d %H:%M:%S")])
+    all_users.clear()
 def check_pw(pw,h): return bcrypt.checkpw(pw.encode(),h.encode())
 
+@st.cache_data(ttl=60, show_spinner=False)
 def all_tickets():  return safe_get_all_records(sheet("tickets"))
 def find_row(tid):
     ws=sheet("tickets"); recs=safe_get_all_records(ws)
@@ -288,7 +292,9 @@ def create_ticket(title,desc,cat,prio,dept,creator,rep_dept="Analytics"):
     sheet("tickets").append_row([tid,title,desc,cat,prio,"OPEN",creator,dept,now,now,"", "", rep_dept])
     t=dict(ticket_id=tid,title=title,description=desc,category=cat,priority=prio,
            status="OPEN",created_by=creator,assigned_to=dept,created_at=now,updated_at=now,resolution_notes="", reporter_dept=rep_dept)
-    email_new_ticket(t); return tid
+    email_new_ticket(t)
+    all_tickets.clear()
+    return tid
 
 def update_ticket(tid,status,notes=""):
     ws,row,t=find_row(tid)
@@ -300,6 +306,7 @@ def update_ticket(tid,status,notes=""):
     if status=="RESOLVED":
         t["resolution_notes"]=notes; t["updated_at"]=now; email_resolved(t)
     log_ticket_history(tid, old_status, status, st.session_state.get("email","System"), notes)
+    all_tickets.clear()
 
 def email_reassigned(t, old_email, new_email, changed_by):
     subj = f"[MPDR] 🔄 Ticket #{t['ticket_id'][:8].upper()} Re-assigned"
@@ -339,6 +346,7 @@ def reassign_ticket(tid, new_email, changed_by):
     log_ticket_history(tid, t.get("status",""), t.get("status",""), changed_by, f"Reassigned to {new_email}")
     t["assigned_email"] = new_email
     email_reassigned(t, old_email, new_email, changed_by)
+    all_tickets.clear()
 
 @st.cache_data(ttl=60, show_spinner=False)
 def all_feedback():
@@ -355,6 +363,7 @@ def submit_fb(tid,by,rating,comments):
     update_ticket(tid,"CLOSED")
     all_feedback.clear()
 
+@st.cache_data(ttl=60, show_spinner=False)
 def all_ticket_comments():
     try:
         ws = get_or_create_sheet("ticket_comments", ["ticket_id", "user", "timestamp", "comment"])
@@ -366,6 +375,7 @@ def add_ticket_comment(tid, user, comment):
     if not comment.strip(): return
     ws = get_or_create_sheet("ticket_comments", ["ticket_id", "user", "timestamp", "comment"])
     ws.append_row([tid, user, now_ist().strftime("%Y-%m-%d %H:%M:%S"), comment])
+    all_ticket_comments.clear()
 
 def render_comments_ui(t, all_comms):
     comms = [c for c in all_comms if c["ticket_id"] == t["ticket_id"]]
@@ -878,6 +888,7 @@ def page_manage_ares():
             values = edited_df.fillna("").values.tolist()
             if values:
                 ws.append_rows(values)
+            get_ares.clear()
             st.success("✅ AREs directory updated successfully! The new data is now live.")
             st.rerun()
 
