@@ -518,6 +518,19 @@ def login_page():
                     if u and check_pw(pwd,str(u["password"])):
                         st.session_state.logged_in=True; st.session_state.email=email
                         st.session_state.role=u["role"]; st.session_state.dept=u["department"]
+                        
+                        depts = []
+                        if u["role"] == "admin":
+                            if email.lower() == "hr@morepenpdr.com":
+                                depts = ["HR"]
+                            elif email.lower() == "admin@morepenpdr.com":
+                                depts = ["Lab Maintenance"]
+                            elif email.lower() == "narendra.s@morepenpdr.com":
+                                depts = ["IT", "Safety"]
+                            elif u.get("department"):
+                                depts = [d.strip() for d in str(u["department"]).split(",") if d.strip()]
+                        st.session_state.depts = depts
+                        
                         st.session_state.page="home"; st.rerun()
                     else: st.error("Invalid email or password.")
 
