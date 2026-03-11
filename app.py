@@ -493,7 +493,7 @@ def get_resolution_time_str(t):
         return f"{hrs:.1f} hrs"
     except: return ""
 
-for k,v in [("logged_in",False),("email",""),("role",""),("dept",""),("page","login")]:
+for k,v in [("logged_in",False),("email",""),("role",""),("depts",[]),("page","login")]:
     if k not in st.session_state: st.session_state[k]=v
 
 def login_page():
@@ -566,7 +566,8 @@ def render_sidebar():
 
         st.markdown("<hr style='border-color:rgba(56,182,255,0.3);margin:1rem 0;'>",unsafe_allow_html=True)
         if st.button("🚪   Logout",use_container_width=True):
-            for k in ["logged_in","email","role","dept","page"]: del st.session_state[k]
+            for k in ["logged_in","email","role","depts","page"]: 
+                if k in st.session_state: del st.session_state[k]
             st.rerun()
         st.markdown('<div style="position:fixed;bottom:1rem;left:0;width:260px;text-align:center;"><p style="color:rgba(255,255,255,0.5);font-size:0.72rem;">MPDR Issue Tracker v1.0<br>Morepen Laboratories</p></div>',unsafe_allow_html=True)
 
@@ -686,9 +687,10 @@ def page_my_tickets():
             render_comments_ui(t, all_comms)
 
 def page_dept():
-    dept=st.session_state.dept
-    st.markdown(f'<div class="page-header"><div class="page-title">🛠️ {dept} — Open Tickets</div><div class="page-sub">Manage and resolve tickets assigned to your department</div></div>',unsafe_allow_html=True)
-    tickets=[t for t in all_tickets() if t["assigned_to"]==dept and t["status"] not in ["RESOLVED","CLOSED"]]
+    depts = st.session_state.get("depts", [])
+    dept_str = " & ".join(depts) if depts else "Department"
+    st.markdown(f'<div class="page-header"><div class="page-title">🛠️ {dept_str} — Open Tickets</div><div class="page-sub">Manage and resolve tickets assigned to your department</div></div>',unsafe_allow_html=True)
+    tickets=[t for t in all_tickets() if t["assigned_to"] in depts and t["status"] not in ["RESOLVED","CLOSED"]]
     if not tickets: st.success("🎉 No open tickets right now!"); return
 
     cn=sum(1 for t in tickets if t["priority"]=="Critical"); hn=sum(1 for t in tickets if t["priority"]=="High")
@@ -749,9 +751,10 @@ def page_dept():
                     st.rerun()
 
 def page_resolved():
-    dept=st.session_state.dept
-    st.markdown(f'<div class="page-header"><div class="page-title">✅ Resolved — {dept}</div><div class="page-sub">Tickets your department has resolved</div></div>',unsafe_allow_html=True)
-    tickets=[t for t in all_tickets() if t["assigned_to"]==dept and t["status"] in ["RESOLVED","CLOSED"]]
+    depts = st.session_state.get("depts", [])
+    dept_str = " & ".join(depts) if depts else "Department"
+    st.markdown(f'<div class="page-header"><div class="page-title">✅ Resolved — {dept_str}</div><div class="page-sub">Tickets your department has resolved</div></div>',unsafe_allow_html=True)
+    tickets=[t for t in all_tickets() if t["assigned_to"] in depts and t["status"] in ["RESOLVED","CLOSED"]]
     if not tickets: st.info("No resolved tickets yet."); return
     fbs={f["ticket_id"]:f for f in all_feedback()}
     for t in reversed(tickets):
