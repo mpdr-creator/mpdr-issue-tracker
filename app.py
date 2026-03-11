@@ -182,14 +182,15 @@ def render_ares_table():
 
 # Status transitions
 ALLOWED_TRANSITIONS = {
-    "OPEN": ["ASSIGNED"],
-    "ASSIGNED": ["IN_PROGRESS"],
-    "IN_PROGRESS": ["RESOLVED"],
-    "RESOLVED": ["CLOSED"]
+    "OPEN": ["ASSIGNED", "IN_PROGRESS", "RESOLVED"],
+    "ASSIGNED": ["OPEN", "IN_PROGRESS", "RESOLVED"],
+    "IN_PROGRESS": ["OPEN", "ASSIGNED", "RESOLVED"],
+    "RESOLVED": ["CLOSED", "OPEN"],
+    "CLOSED": ["OPEN"]
 }
 
 # SLA resolution deadlines (hours) per priority
-SLA_HOURS = {"Critical": 4, "High": 24, "Medium": 72, "Low": 168}
+SLA_HOURS = {"Critical": 8, "High": 24, "Medium": 72, "Low": 168}
 
 def get_or_create_sheet(name, cols):
     client = get_client().open("MPDR Issue Tracker")
