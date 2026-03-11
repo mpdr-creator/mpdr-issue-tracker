@@ -5,13 +5,16 @@ import bcrypt
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import datetime
 from datetime import datetime, timezone, timedelta
+import random
 
 # Indian Standard Time (UTC+5:30)
 IST = timezone(timedelta(hours=5, minutes=30))
 def now_ist():
     """Return current datetime in Indian Standard Time."""
     return datetime.now(IST)
+
 import uuid
 import plotly.express as px
 import pandas as pd
@@ -154,19 +157,19 @@ def render_ares_table():
     recs = get_ares()
     rows_html = ""
     for r in recs:
-        rows_html += f"""<tr style="border-bottom:1px solid #e8f4ff;">
-      <td style="padding:4px; color:#0d2d5e; font-weight:600;">{r.get('Icon','')} {r.get('Category','')}</td>
-      <td style="padding:4px; color:#0d2d5e;">{r.get('Name','')}</td>
-      <td style="padding:4px; color:#8b949e;">{r.get('Responsibility','')}</td>
-      <td style="padding:4px; color:#58a6ff;">{r.get('Email','')}</td>
-      <td style="padding:4px; color:#8b949e;">{str(r.get('Phone',''))}</td>
+        rows_html += f"""<tr style="border-bottom:1px solid #c8e3ff;">
+      <td style="padding:4px; color:#000000; font-weight:600;">{r.get('Icon','')} {r.get('Category','')}</td>
+      <td style="padding:4px; color:#000000;">{r.get('Name','')}</td>
+      <td style="padding:4px; color:#000000;">{r.get('Responsibility','')}</td>
+      <td style="padding:4px; color:#000000; font-weight:500;">{r.get('Email','')}</td>
+      <td style="padding:4px; color:#000000;">{str(r.get('Phone',''))}</td>
     </tr>"""
         
-    return f"""<div class="info-card" style="margin-top:1rem; margin-bottom:1rem;"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">🏢 AREs - Admin Representative Employees</p>
+    return f"""<div class="info-card" style="margin-top:1rem; margin-bottom:1rem;"><p style="color:#000000;font-weight:700;margin:0 0 12px 0;">🏢 AREs - Admin Representative Employees</p>
 <div style="overflow-x:auto;">
 <table style="width:100%; border-collapse:collapse; font-size:0.8rem; text-align:left;">
   <thead>
-    <tr style="border-bottom:1px solid #c8e3ff; color:#4a7ab5;">
+    <tr style="border-bottom:2px solid #90c6ff; color:#000000;">
       <th style="padding:4px;">Category</th>
       <th style="padding:4px;">Name</th>
       <th style="padding:4px;">Responsibility</th>
@@ -190,7 +193,7 @@ ALLOWED_TRANSITIONS = {
 }
 
 # SLA resolution deadlines (hours) per priority
-SLA_HOURS = {"Critical": 8, "High": 24, "Medium": 72, "Low": 168}
+SLA_HOURS = {"Critical": 4, "High": 24, "Medium": 72, "Low": 168}
 
 def get_or_create_sheet(name, cols):
     client = get_client().open("MPDR Issue Tracker")
@@ -223,6 +226,19 @@ def send_email(to_list, subject, html_body):
     except Exception as e:
         st.toast(f"Email error: {e}",icon="⚠️")
         return False
+
+def send_otp_email(to_email, otp, context="register"):
+    subj = "[MPDR] Your Verification Code"
+    action = "registration" if context == "register" else "password reset"
+    html = f"""<div style="font-family:Arial,sans-serif;background:#0d1117;color:#e6edf3;padding:30px;border-radius:12px;max-width:600px;margin:0 auto;">
+<div style="text-align:center;margin-bottom:24px;"><div style="font-size:2.5rem;">🔐</div>
+<h2 style="color:#58a6ff;margin:8px 0 4px 0;">Verification Code</h2>
+<p style="color:#8b949e;font-size:0.85rem;margin:0;">For your {action}</p></div>
+<div style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:20px;text-align:center;margin-bottom:16px;">
+<div style="font-size:2rem;font-weight:700;letter-spacing:4px;color:#f0a500;">{otp}</div>
+<p style="color:#8b949e;font-size:0.85rem;margin-top:10px;">Please enter this code in the app to proceed.</p></div>
+<p style="color:#8b949e;font-size:0.8rem;text-align:center;">MPDR Issue Tracker · Morepen Laboratories</p></div>"""
+    return send_email(to_email, subj, html)
 
 def email_new_ticket(t):
     subj = f"[MPDR] New Ticket #{t['ticket_id'][:8].upper()} — {t['priority']} Priority"
@@ -279,6 +295,16 @@ def register_user(email,password,role,dept=""):
     sheet("users").append_row([email,h,role,dept,now_ist().strftime("%Y-%m-%d %H:%M:%S")])
     all_users.clear()
 def check_pw(pw,h): return bcrypt.checkpw(pw.encode(),h.encode())
+def update_user_password(email, new_password):
+    ws = sheet("users")
+    recs = ws.get_all_records()
+    for i, r in enumerate(recs):
+        if r["email"] == email:
+            h = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+            ws.update_cell(i + 2, 2, h)
+            all_users.clear()
+            return True
+    return False
 
 @st.cache_data(ttl=60, show_spinner=False)
 def all_tickets():
@@ -494,7 +520,9 @@ def get_resolution_time_str(t):
         return f"{hrs:.1f} hrs"
     except: return ""
 
-for k,v in [("logged_in",False),("email",""),("role",""),("depts",[]),("page","login")]:
+for k,v in [("logged_in",False),("email",""),("role",""),("depts",[]),("page","login"),
+            ("r_otp_sent", False), ("r_otp", ""), ("temp_r_data", ()),
+            ("f_otp_sent", False), ("f_otp", ""), ("temp_f_email", "")]:
     if k not in st.session_state: st.session_state[k]=v
 
 def login_page():
@@ -505,7 +533,7 @@ def login_page():
 <h1 style="color:#0d2d5e;font-size:1.8rem;font-weight:700;margin:0.3rem 0 0.2rem 0;">MPDR Issue Tracker</h1>
 <p style="color:#4a7ab5;font-size:0.9rem;margin:0;">Morepen Laboratories · Pharmaceutical Research Division</p></div>""",unsafe_allow_html=True)
 
-        t1,t2=st.tabs(["🔐  Sign In","📝  Register"])
+        t1,t2,t3=st.tabs(["🔐  Sign In","📝  Register","🔑  Forgot Password"])
         with t1:
             st.markdown("<br>",unsafe_allow_html=True)
             email=st.text_input("Company Email",placeholder="yourname@morepenpdr.com",key="li_e")
@@ -536,20 +564,91 @@ def login_page():
                     else: st.error("Invalid email or password.")
 
         with t2:
-            st.markdown("<br>",unsafe_allow_html=True)
-            re=st.text_input("Company Email",placeholder="yourname@morepenpdr.com",key="re_e")
-            rp=st.text_input("Password (min 6 chars)",type="password",key="re_p")
-            rp2=st.text_input("Confirm Password",type="password",key="re_p2")
-            rr=st.selectbox("Role",["scientist","admin","management"],key="re_r")
-            rd=""
-            if rr=="admin": rd=st.selectbox("Department",["IT","Lab Maintenance","Safety","HR"],key="re_d")
-            st.markdown("<br>",unsafe_allow_html=True)
-            if st.button("Create Account →",use_container_width=True,key="btn_re"):
-                if not re.endswith("@morepenpdr.com"): st.error("⛔ Only @morepenpdr.com emails allowed.")
-                elif get_user(re): st.error("Email already registered.")
-                elif len(rp)<6: st.error("Password must be at least 6 characters.")
-                elif rp!=rp2: st.error("Passwords do not match.")
-                else: register_user(re,rp,rr,rd); st.success("✅ Account created! Please sign in.")
+            if not st.session_state.r_otp_sent:
+                st.markdown("<br>",unsafe_allow_html=True)
+                re=st.text_input("Company Email",placeholder="yourname@morepenpdr.com",key="re_e")
+                rp=st.text_input("Password (min 6 chars)",type="password",key="re_p")
+                rp2=st.text_input("Confirm Password",type="password",key="re_p2")
+                rr=st.selectbox("Role",["scientist","admin","management"],key="re_r")
+                rd=""
+                if rr=="admin": rd=st.selectbox("Department",["IT","Lab Maintenance","Safety","HR"],key="re_d")
+                st.markdown("<br>",unsafe_allow_html=True)
+                if st.button("Send OTP →",use_container_width=True,key="btn_re_otp"):
+                    if not re.endswith("@morepenpdr.com"): st.error("⛔ Only @morepenpdr.com emails allowed.")
+                    elif get_user(re): st.error("Email already registered.")
+                    elif len(rp)<6: st.error("Password must be at least 6 characters.")
+                    elif rp!=rp2: st.error("Passwords do not match.")
+                    else:
+                        otp = str(random.randint(1000, 9999))
+                        st.session_state.r_otp = otp
+                        if send_otp_email(re, otp):
+                            st.session_state.r_otp_sent = True
+                            st.session_state.temp_r_data = (re, rp, rr, rd)
+                            st.success(f"✅ OTP sent to {re}")
+                            st.rerun()
+                        else:
+                            st.error("Failed to send OTP email.")
+            else:
+                st.info(f"Enter the 4-digit OTP sent to {st.session_state.temp_r_data[0]}")
+                otp_input = st.text_input("Enter OTP", key="reg_otp")
+                c_reg1, c_reg2 = st.columns(2)
+                with c_reg1:
+                    if st.button("Verify & Register", use_container_width=True, type="primary"):
+                        if otp_input == st.session_state.r_otp:
+                            re, rp, rr, rd = st.session_state.temp_r_data
+                            register_user(re, rp, rr, rd)
+                            st.success("✅ Account created! Please sign in.")
+                            st.session_state.r_otp_sent = False
+                        else:
+                            st.error("Invalid OTP!")
+                with c_reg2:
+                    if st.button("Cancel", use_container_width=True):
+                        st.session_state.r_otp_sent = False
+                        st.rerun()
+
+        with t3:
+            if not st.session_state.f_otp_sent:
+                st.markdown("<br>",unsafe_allow_html=True)
+                fe=st.text_input("Registered Company Email",placeholder="yourname@morepenpdr.com",key="fe_e")
+                if st.button("Send Reset OTP →",use_container_width=True,key="btn_fe_otp"):
+                    if not fe.endswith("@morepenpdr.com"): st.error("⛔ Only @morepenpdr.com emails allowed.")
+                    elif not get_user(fe): st.error("Email not found in records.")
+                    else:
+                        otp = str(random.randint(1000, 9999))
+                        st.session_state.f_otp = otp
+                        if send_otp_email(fe, otp):
+                            st.session_state.f_otp_sent = True
+                            st.session_state.temp_f_email = fe
+                            st.success(f"✅ Reset OTP sent to {fe}")
+                            st.rerun()
+                        else:
+                            st.error("Failed to send OTP email.")
+            else:
+                st.info(f"Enter the 4-digit OTP sent to {st.session_state.temp_f_email} and your new password")
+                f_otp_input = st.text_input("Enter OTP", key="forgot_otp")
+                new_f_pwd = st.text_input("New Password (min 6 chars)", type="password", key="forgot_pwd_new")
+                new_f_pwd2 = st.text_input("Confirm New Password", type="password", key="forgot_pwd_new2")
+                c_f1, c_f2 = st.columns(2)
+                with c_f1:
+                    if st.button("Reset Password", use_container_width=True, type="primary"):
+                        if f_otp_input != st.session_state.f_otp:
+                            st.error("Invalid OTP!")
+                        elif len(new_f_pwd) < 6:
+                            st.error("Password must be at least 6 characters.")
+                        elif new_f_pwd != new_f_pwd2:
+                            st.error("Passwords do not match.")
+                        else:
+                            if update_user_password(st.session_state.temp_f_email, new_f_pwd):
+                                st.success("✅ Password updated successfully! Please sign in.")
+                                st.session_state.f_otp_sent = False
+                                st.session_state.f_otp = ""
+                                st.session_state.temp_f_email = ""
+                            else:
+                                st.error("Failed to update password.")
+                with c_f2:
+                    if st.button("Cancel", key="cancel_forgot", use_container_width=True):
+                        st.session_state.f_otp_sent = False
+                        st.rerun()
 
         st.markdown('<p style="text-align:center;color:#6e7681;font-size:0.78rem;margin-top:2rem;">🔒 Secure · Only @morepenpdr.com accounts permitted</p>',unsafe_allow_html=True)
 
@@ -607,31 +706,31 @@ def page_create():
                 dept_email = DEPT_EMAILS.get(dept, "admin@morepenpdr.com")
                 st.success(f"✅ **Ticket submitted!** ID: `#{tid[:8].upper()}` · Notification sent to {dept_email}")
     with c2:
-        st.markdown("""<div class="info-card"><p style="color:#58a6ff;font-weight:600;margin:0 0 12px 0;">📌 ATT - Acceptable Turn-around Time</p>
+        st.markdown("""<div class="info-card"><p style="color:#000000;font-weight:700;margin:0 0 12px 0;">📌 ATT - Acceptable Turn-around Time</p>
 <div style="overflow-x:auto;">
 <table style="width:100%; border-collapse:collapse; font-size:0.8rem; text-align:left;">
   <thead>
-    <tr style="border-bottom:1px solid #c8e3ff; color:#4a7ab5;">
+    <tr style="border-bottom:2px solid #90c6ff; color:#000000;">
       <th style="padding:4px;">Priority</th>
       <th style="padding:4px;">Time</th>
     </tr>
   </thead>
   <tbody>
-    <tr style="border-bottom:1px solid #e8f4ff;">
+    <tr style="border-bottom:1px solid #c8e3ff;">
       <td style="padding:4px;"><span class="badge b-critical" style="background:#fca5a5;">Critical</span></td>
-      <td style="padding:4px; color:#8b949e;">24hrs</td>
+      <td style="padding:4px; color:#000000; font-weight:500;">24hrs</td>
     </tr>
-    <tr style="border-bottom:1px solid #e8f4ff;">
+    <tr style="border-bottom:1px solid #c8e3ff;">
       <td style="padding:4px;"><span class="badge b-high">High</span></td>
-      <td style="padding:4px; color:#8b949e;">48hrs</td>
+      <td style="padding:4px; color:#000000; font-weight:500;">48hrs</td>
     </tr>
-    <tr style="border-bottom:1px solid #e8f4ff;">
+    <tr style="border-bottom:1px solid #c8e3ff;">
       <td style="padding:4px;"><span class="badge b-medium">Medium</span></td>
-      <td style="padding:4px; color:#8b949e;">72hrs</td>
+      <td style="padding:4px; color:#000000; font-weight:500;">72hrs</td>
     </tr>
     <tr>
       <td style="padding:4px;"><span class="badge b-low">Low</span></td>
-      <td style="padding:4px; color:#8b949e;">96hrs</td>
+      <td style="padding:4px; color:#000000; font-weight:500;">96hrs</td>
     </tr>
   </tbody>
 </table>
