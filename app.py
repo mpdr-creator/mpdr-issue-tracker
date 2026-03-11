@@ -741,7 +741,7 @@ def page_dept():
 <p style="margin:4px 0;"><b>SLA:</b> {sla_badge(_sla)}</p>{_sla_bar}</div>""",unsafe_allow_html=True)
             with c2:
                 st.markdown(f"""<div class="info-card"><p style="color:#8b949e;font-size:0.78rem;margin:0 0 10px 0;">DESCRIPTION</p>
-<p style="color:#e6edf3;line-height:1.6;font-size:0.9rem;">{t['description']}</p></div>""",unsafe_allow_html=True)
+<p style="color:#000000;line-height:1.6;font-size:0.9rem;">{t['description']}</p></div>""",unsafe_allow_html=True)
 
             render_comments_ui(t, all_comms)
             st.markdown("**Update Ticket**")
