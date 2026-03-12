@@ -195,11 +195,11 @@ def get_ares():
 
 def render_ares_table():
     html = """
-<div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:20px; overflow-x:auto; margin-bottom:20px;">
-<h3 style="color:#58a6ff; margin-top:0; font-size:1.1rem; border-bottom:1px solid #30363d; padding-bottom:10px;">🛡️ AREs – Administrative Responsible Entities</h3>
-<table style="width:100%; border-collapse:collapse; color:#e6edf3; font-size:0.85rem; text-align:left;">
+<div style="background:#e0f2fe; border:1px solid #bae6fd; border-radius:12px; padding:20px; overflow-x:auto; margin-bottom:20px; color:#000000;">
+<h3 style="color:#0369a1; margin-top:0; font-size:1.1rem; border-bottom:1px solid #bae6fd; padding-bottom:10px;">🛡️ AREs – Administrative Responsible Entities</h3>
+<table style="width:100%; border-collapse:collapse; color:#000000; font-size:0.85rem; text-align:left;">
 <thead>
-<tr style="border-bottom:1px solid #30363d; color:#8b949e; text-transform:uppercase; font-size:0.75rem;">
+<tr style="border-bottom:2px solid #bae6fd; color:#0369a1; text-transform:uppercase; font-size:0.75rem;">
 <th style="padding:10px 5px;">Department</th>
 <th style="padding:10px 5px;">Responsibility</th>
 <th style="padding:10px 5px;">Concerned Person</th>
@@ -212,16 +212,20 @@ def render_ares_table():
     for dept, info in ARE_DATA.items():
         email_display = ", ".join(info['Email'])
         html += f"""
-<tr style="border-bottom:1px solid #21262d;">
-<td style="padding:12px 5px; font-weight:600; color:#58a6ff;">{info['Icon']} {dept}</td>
-<td style="padding:12px 5px; color:#8b949e; font-size:0.8rem; line-height:1.4;">{info['Responsibility']}</td>
+<tr style="border-bottom:1px solid #bae6fd;">
+<td style="padding:12px 5px; font-weight:600; color:#0369a1;">{info['Icon']} {dept}</td>
+<td style="padding:12px 5px; color:#334155; font-size:0.8rem; line-height:1.4;">{info['Responsibility']}</td>
 <td style="padding:12px 5px;">{info['Concerned Person']}</td>
-<td style="padding:12px 5px;"><a href="mailto:{email_display}" style="color:#58a6ff; text-decoration:none;">{email_display}</a></td>
-<td style="padding:12px 5px; color:#f0a500; font-family:monospace;">{info['Phone']}</td>
+<td style="padding:12px 5px;"><a href="mailto:{email_display}" style="color:#0284c7; text-decoration:none; font-weight:500;">{email_display}</a></td>
+<td style="padding:12px 5px; color:#9a3412; font-family:monospace; font-weight:600;">{info['Phone']}</td>
 </tr>
 """
     html += "</tbody></table></div>"
     return html
+
+def render_ares_ui():
+    with st.expander("🛡️ Administrative Responsible Entities (AREs) Contact List", expanded=False):
+        st.markdown(render_ares_table(), unsafe_allow_html=True)
 
 # Status transitions
 ALLOWED_TRANSITIONS = {
@@ -761,6 +765,7 @@ def render_sidebar():
 
 def page_create():
     st.markdown('<div class="page-header"><div class="page-title">➕ Report New Issue</div><div class="page-sub">Submit a ticket to the appropriate department for resolution</div></div>',unsafe_allow_html=True)
+    render_ares_ui()
     c1,c2=st.columns([2,1])
     with c1:
         with st.form("new_t",clear_on_submit=True):
@@ -809,11 +814,11 @@ def page_create():
     </tr>
   </tbody>
 </table>
-</div></div>""" + render_ares_table(),unsafe_allow_html=True)
+</div></div>""",unsafe_allow_html=True)
 
 def page_my_tickets():
     st.markdown('<div class="page-header"><div class="page-title">📋 My Tickets</div><div class="page-sub">Track all issues you have reported</div></div>',unsafe_allow_html=True)
-    st.markdown("<br>" + render_ares_table(),unsafe_allow_html=True)
+    render_ares_ui()
     tickets=[t for t in all_tickets() if t["created_by"]==st.session_state.email]
     if not tickets: st.info("No tickets yet. Click New Ticket to report an issue."); return
 
@@ -891,7 +896,7 @@ def page_dept():
     with b: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff4444;">{cn}</div><div class="stat-label">Critical</div></div>',unsafe_allow_html=True)
     with c: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff7b72;">{hn}</div><div class="stat-label">High</div></div>',unsafe_allow_html=True)
 
-    st.markdown("<br>" + render_ares_table(),unsafe_allow_html=True)
+    render_ares_ui()
     po={"Critical":0,"High":1,"Medium":2,"Low":3}
     tickets=sorted(tickets,key=lambda x:po.get(x["priority"],4))
     c1,c2=st.columns(2)
@@ -946,7 +951,7 @@ def page_resolved():
     depts = st.session_state.get("depts", [])
     dept_str = " & ".join(depts) if depts else "Department"
     st.markdown(f'<div class="page-header"><div class="page-title">✅ Resolved — {dept_str}</div><div class="page-sub">Tickets your department has resolved</div></div>',unsafe_allow_html=True)
-    st.markdown("<br>" + render_ares_table(),unsafe_allow_html=True)
+    render_ares_ui()
     tickets=[t for t in all_tickets() if t["assigned_to"] in depts and t["status"] in ["RESOLVED","CLOSED"]]
     if not tickets: st.info("No resolved tickets yet."); return
     fbs={f["ticket_id"]:f for f in all_feedback()}
@@ -979,7 +984,7 @@ def page_dashboard():
     with c: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#f0a500;">{ip}</div><div class="stat-label">In Progress</div></div>',unsafe_allow_html=True)
     with d: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#3fb950;">{rn}</div><div class="stat-label">Resolved</div></div>',unsafe_allow_html=True)
     with e: st.markdown(f'<div class="stat-card"><div class="stat-number" style="color:#ff4444;">{cr}</div><div class="stat-label">Critical</div></div>',unsafe_allow_html=True)
-    st.markdown("<br>" + render_ares_table(),unsafe_allow_html=True)
+    render_ares_ui()
 
     BG="#161b22"; FC="#e6edf3"; GC="#21262d"
     def sty(fig):
@@ -1083,7 +1088,7 @@ def page_manage_ares():
 
 def page_all_tickets():
     st.markdown('<div class="page-header"><div class="page-title">📋 All Tickets</div><div class="page-sub">Complete view of every ticket in the system</div></div>',unsafe_allow_html=True)
-    st.markdown("<br>" + render_ares_table(),unsafe_allow_html=True)
+    render_ares_ui()
     tickets=all_tickets()
     if not tickets: st.info("No tickets yet."); return
     c1,c2,c3,c4=st.columns(4)
