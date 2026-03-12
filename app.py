@@ -231,7 +231,7 @@ def render_ares_table():
 
 def render_ares_ui():
     st.markdown('<div class="ares-expander">', unsafe_allow_html=True)
-    with st.expander("🛡️ Administrative Responsible Entities (AREs) Contact List", expanded=False):
+    with st.expander("🛡️ Administrative Responsible Employees (AREs) Contact List", expanded=False):
         st.markdown(render_ares_table(), unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
