@@ -114,7 +114,7 @@ CC_EMAILS = ["admin@morepenpdr.com", "deepa.g@morepenpdr.com"]
 
 # --- ARE DATA (Admin Representative Employees) ---
 # Edit this dictionary to change responsibilities, concerns, emails, or phone numbers.
-# The routing and the UI table will update automatically.
+# The routing and the UI table will update automatically .
 ARE_DATA = {
     "Admin": {
         "Responsibility": "Office administration, facility management, stationery, vendor coordination, transport arrangements",
@@ -224,7 +224,7 @@ def render_ares_table():
     return html
 
 def render_ares_ui():
-    with st.expander("🛡️ Administrative Responsible Entities (AREs) Contact List", expanded=False):
+    with st.expander("🛡️ Administrative Responsible Employees (AREs) Contact List", expanded=False):
         st.markdown(render_ares_table(), unsafe_allow_html=True)
 
 # Status transitions
