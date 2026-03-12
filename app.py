@@ -110,58 +110,13 @@ def sheet(tab):
 
 NOTIFY_EMAILS = ["admin@morepenpdr.com","mpdr.services@gmail.com"]
 
-CC_EMAILS = ["admin@morepenpdr.com", "deepa.g@morepenpdr.com"]
-
-# --- ARE DATA (Admin Representative Employees) ---
-# Edit this dictionary to change responsibilities, concerns, emails, or phone numbers.
-# The routing and the UI table will update automatically.
-ARE_DATA = {
-    "Admin": {
-        "Responsibility": "Office administration, facility management, stationery, vendor coordination, transport arrangements",
-        "Concerned Person": "Rahul Swamy",
-        "Email": ["admin@morepenpdr.com"],
-        "Phone": "9247527624, 9247527625",
-        "Icon": "🏢"
-    },
-    "HR": {
-        "Responsibility": "Recruitment, employee onboarding, attendance, payroll coordination, policy compliance",
-        "Concerned Person": "Deepa G",
-        "Email": ["deepa.g@morepenpdr.com"],
-        "Phone": "9247527626",
-        "Icon": "👥"
-    },
-    "IT": {
-        "Responsibility": "Computer systems, network connectivity, software troubleshooting, hardware maintenance, system access",
-        "Concerned Person": "Narendra S",
-        "Email": ["admin@morepenpdr.com", "narendra.s@morepenpdr.com"],
-        "Phone": "9247527627",
-        "Icon": "💻"
-    },
-    "Lab Maintenance": {
-        "Responsibility": "Lab equipment servicing, AMC management, glassware supply, gas cylinder management",
-        "Concerned Person": "Vamsi M",
-        "Email": ["admin@morepenpdr.com", "vamsi.m@morepenpdr.com"],
-        "Phone": "9247527628",
-        "Icon": "🛠️"
-    },
-    "House Keeping": {
-        "Responsibility": "Cleaning services, waste management, cafeteria oversight, general sanitation",
-        "Concerned Person": "Rahul Swamy",
-        "Email": ["admin@morepenpdr.com"],
-        "Phone": "9247527629",
-        "Icon": "🧹"
-    },
-    "Security": {
-        "Responsibility": "Access control, visitor logs, surveillance monitoring, night shift protocols, perimeter safety",
-        "Concerned Person": "Rahul Swamy",
-        "Email": ["admin@morepenpdr.com"],
-        "Phone": "9247527630",
-        "Icon": "🛡️"
-    }
+# Department → recipient email mapping
+DEPT_EMAILS = {
+    "IT":              "narendra.s@morepenpdr.com",
+    "Lab Maintenance": "admin@morepenpdr.com",
+    "HR":              "hr@morepenpdr.com",
+    "Safety":          "narendra.s@morepenpdr.com",
 }
-
-# Automatically derive department -> email mapping from ARE_DATA
-DEPT_EMAILS = {dept: data["Email"] for dept, data in ARE_DATA.items()}
 
 def safe_get_all_records(ws):
     """Robust version of get_all_records to handle duplicate or empty headers."""
@@ -185,43 +140,48 @@ def safe_get_all_records(ws):
 
 @st.cache_data(ttl=60, show_spinner=False)
 def get_ares():
-    """Returns ARE data as a list of dictionaries for backward compatibility with table rendering."""
-    recs = []
-    for dept, data in ARE_DATA.items():
-        row = data.copy()
-        row["Category"] = dept
-        recs.append(row)
+    ws = get_or_create_sheet("ares", ["Category", "Name", "Responsibility", "Email", "Phone", "Icon"])
+    recs = safe_get_all_records(ws)
+    if not recs:
+        initial = [
+            ["Lab Maintenance", "Manisha", "Equipment", "admin@morepenpdr.com", "6300535593", "🧪"],
+            ["IT", "Narendra", "Software, network", "narendra.s@morepenpdr.com", "8106107921", "🖥️"],
+            ["Safety", "Narendra", "Hazards, compliance", "narendra.s@morepenpdr.com", "8106107921", "⚠️"],
+            ["HR", "Nikhitha", "HR matters", "hr@morepenpdr.com", "6302451459", "👥"]
+        ]
+        for row in initial: ws.append_row(row)
+        recs = ws.get_all_records()
     return recs
 
 def render_ares_table():
-    html = """
-    <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:20px; overflow-x:auto; margin-bottom:20px;">
-    <h3 style="color:#58a6ff; margin-top:0; font-size:1.1rem; border-bottom:1px solid #30363d; padding-bottom:10px;">🛡️ AREs – Administrative Responsible Entities</h3>
-    <table style="width:100%; border-collapse:collapse; color:#e6edf3; font-size:0.85rem; text-align:left;">
-    <thead>
-        <tr style="border-bottom:1px solid #30363d; color:#8b949e; text-transform:uppercase; font-size:0.75rem;">
-            <th style="padding:10px 5px;">Department</th>
-            <th style="padding:10px 5px;">Responsibility</th>
-            <th style="padding:10px 5px;">Concerned Person</th>
-            <th style="padding:10px 5px;">Email</th>
-            <th style="padding:10px 5px;">Phone Number</th>
-        </tr>
-    </thead>
-    <tbody>
-    """
-    for dept, info in ARE_DATA.items():
-        email_display = ", ".join(info['Email'])
-        html += f"""
-        <tr style="border-bottom:1px solid #21262d;">
-            <td style="padding:12px 5px; font-weight:600; color:#58a6ff;">{info['Icon']} {dept}</td>
-            <td style="padding:12px 5px; color:#8b949e; font-size:0.8rem; line-height:1.4;">{info['Responsibility']}</td>
-            <td style="padding:12px 5px;">{info['Concerned Person']}</td>
-            <td style="padding:12px 5px;"><a href="mailto:{email_display}" style="color:#58a6ff; text-decoration:none;">{email_display}</a></td>
-            <td style="padding:12px 5px; color:#f0a500; font-family:monospace;">{info['Phone']}</td>
-        </tr>
-        """
-    html += "</tbody></table></div>"
-    return html
+    recs = get_ares()
+    rows_html = ""
+    for r in recs:
+        rows_html += f"""<tr style="border-bottom:1px solid #c8e3ff;">
+      <td style="padding:4px; color:#000000; font-weight:600;">{r.get('Icon','')} {r.get('Category','')}</td>
+      <td style="padding:4px; color:#000000;">{r.get('Name','')}</td>
+      <td style="padding:4px; color:#000000;">{r.get('Responsibility','')}</td>
+      <td style="padding:4px; color:#000000; font-weight:500;">{r.get('Email','')}</td>
+      <td style="padding:4px; color:#000000;">{str(r.get('Phone',''))}</td>
+    </tr>"""
+        
+    return f"""<div class="info-card" style="margin-top:1rem; margin-bottom:1rem;"><p style="color:#000000;font-weight:700;margin:0 0 12px 0;">🏢 AREs - Admin Representative Employees</p>
+<div style="overflow-x:auto;">
+<table style="width:100%; border-collapse:collapse; font-size:0.8rem; text-align:left;">
+  <thead>
+    <tr style="border-bottom:2px solid #90c6ff; color:#000000;">
+      <th style="padding:4px;">Category</th>
+      <th style="padding:4px;">Name</th>
+      <th style="padding:4px;">Responsibility</th>
+      <th style="padding:4px;">e-mail</th>
+      <th style="padding:4px;">Ph. No.</th>
+    </tr>
+  </thead>
+  <tbody>
+    {rows_html}
+  </tbody>
+</table>
+</div></div>"""
 
 # Status transitions
 ALLOWED_TRANSITIONS = {
@@ -248,40 +208,39 @@ def log_ticket_history(tid, old_status, new_status, by, notes=""):
     ws.append_row([tid, old_status, new_status, by, now_ist().strftime("%Y-%m-%d %H:%M:%S"), notes])
 
 
-def send_email(to_list, subject, html_body, cc=None):
+def send_email(to_list, subject, html_body):
     try:
         user = st.secrets["gmail"]["user"]
-        pwd = st.secrets["gmail"]["app_password"]
-        
-        targets = to_list if isinstance(to_list, list) else [to_list]
-        cc_targets = cc if isinstance(cc, list) else ([cc] if cc else [])
-        
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"MPDR Issue Tracker <{user}>"
-        msg["To"] = ", ".join(targets)
-        if cc_targets:
-            msg["Cc"] = ", ".join(cc_targets)
-        
-        msg.attach(MIMEText(html_body, "html"))
-        
-        # Combine To and CC for delivery
-        all_recipients = list(set(targets + cc_targets))
-        
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(user, pwd)
-            server.sendmail(user, all_recipients, msg.as_string())
+        pwd  = st.secrets["gmail"]["app_password"]
+        targets = to_list if isinstance(to_list,list) else [to_list]
+        for to_email in targets:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"]    = f"MPDR Issue Tracker <{user}>"
+            msg["To"]      = to_email
+            msg.attach(MIMEText(html_body,"html"))
+            with smtplib.SMTP_SSL("smtp.gmail.com",465) as srv:
+                srv.login(user,pwd)
+                srv.sendmail(user,to_email,msg.as_string())
         return True
     except Exception as e:
-        st.toast(f"Email error: {e}", icon="⚠️")
+        st.toast(f"Email error: {e}",icon="⚠️")
         return False
 
+def send_otp_email(to_email, otp, context="register"):
+    subj = "[MPDR] Your Verification Code"
+    action = "registration" if context == "register" else "password reset"
+    html = f"""<div style="font-family:Arial,sans-serif;background:#0d1117;color:#e6edf3;padding:30px;border-radius:12px;max-width:600px;margin:0 auto;">
+<div style="text-align:center;margin-bottom:24px;"><div style="font-size:2.5rem;">🔐</div>
+<h2 style="color:#58a6ff;margin:8px 0 4px 0;">Verification Code</h2>
+<p style="color:#8b949e;font-size:0.85rem;margin:0;">For your {action}</p></div>
+<div style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:20px;text-align:center;margin-bottom:16px;">
+<div style="font-size:2rem;font-weight:700;letter-spacing:4px;color:#f0a500;">{otp}</div>
+<p style="color:#8b949e;font-size:0.85rem;margin-top:10px;">Please enter this code in the app to proceed.</p></div>
+<p style="color:#8b949e;font-size:0.8rem;text-align:center;">MPDR Issue Tracker · Morepen Proprietary Drug Research Pvt. Ltd.</p></div>"""
+    return send_email(to_email, subj, html)
+
 def email_new_ticket(t):
-    # Route to the department-specific email; fall back to all admins
-    recipient = DEPT_EMAILS.get(t.get('assigned_to',''), NOTIFY_EMAILS)
-    if isinstance(recipient, str):
-        recipient = [recipient]
-    
     subj = f"[MPDR] New Ticket #{t['ticket_id'][:8].upper()} — {t['priority']} Priority"
     html = f"""<div style="font-family:Arial,sans-serif;background:#0d1117;color:#e6edf3;padding:30px;border-radius:12px;max-width:600px;margin:0 auto;">
 <div style="text-align:center;margin-bottom:24px;"><div style="font-size:2rem;">🔬</div>
@@ -301,7 +260,9 @@ def email_new_ticket(t):
 <p style="color:#8b949e;font-size:0.82rem;margin:0 0 6px 0;">DESCRIPTION</p>
 <p style="color:#e6edf3;margin:0;line-height:1.6;">{t['description']}</p></div>
 <p style="color:#8b949e;font-size:0.8rem;text-align:center;">Login to MPDR Issue Tracker to manage this ticket.</p></div>"""
-    send_email(recipient, subj, html, cc=CC_EMAILS)
+    # Route to the department-specific email; fall back to all admins
+    recipient = DEPT_EMAILS.get(t.get('assigned_to',''), NOTIFY_EMAILS)
+    send_email(recipient, subj, html)
 
 def email_resolved(t):
     subj = f"[MPDR] ✅ Your ticket #{t['ticket_id'][:8].upper()} has been resolved"
@@ -324,7 +285,7 @@ def email_resolved(t):
 <p style="color:#e6edf3;font-weight:600;margin:0 0 8px 0;">How was our support?</p>
 <p style="color:#8b949e;font-size:0.85rem;margin:0;">Please login to <strong style="color:#58a6ff;">MPDR Issue Tracker</strong> and submit your star rating feedback to close the ticket.</p></div>
 <p style="color:#8b949e;font-size:0.8rem;text-align:center;">MPDR Issue Tracker · Morepen Proprietary Drug Research Pvt. Ltd.</p></div>"""
-    send_email([t['created_by']], subj, html, cc=CC_EMAILS)
+    send_email(t['created_by'], subj, html)
 
 @st.cache_data(ttl=60, show_spinner=False)
 def all_users():    return safe_get_all_records(sheet("users"))
@@ -395,9 +356,9 @@ def email_reassigned(t, old_email, new_email, changed_by):
 </div>
 <p style="color:#8b949e;font-size:0.8rem;text-align:center;">Login to MPDR Issue Tracker to manage this ticket.</p></div>"""
     
-    recipients = list(set([t.get('created_by'), str(old_email), str(new_email), changed_by]))
-    recipients = [r for r in recipients if r and "@" in str(r)]
-    send_email(recipients, subj, html, cc=CC_EMAILS)
+    recipients = list(set([t.get('created_by'), old_email, new_email, changed_by]))
+    recipients = [r for r in recipients if r]
+    send_email(recipients, subj, html)
 
 def reassign_ticket(tid, new_email, changed_by):
     ws,row,t=find_row(tid)
@@ -422,35 +383,6 @@ def reassign_ticket(tid, new_email, changed_by):
     email_reassigned(t, old_email, new_email, changed_by)
     all_tickets.clear()
 
-def email_feedback(t, rating, comments):
-    subj = f"[MPDR] ⭐ Feedback Received for Ticket #{t['ticket_id'][:8].upper()}"
-    stars = "★" * rating + "☆" * (5-rating)
-    html = f"""<div style="font-family:Arial,sans-serif;background:#0d1117;color:#e6edf3;padding:30px;border-radius:12px;max-width:600px;margin:0 auto;">
-<div style="text-align:center;margin-bottom:24px;"><div style="font-size:2rem;">⭐</div>
-<h2 style="color:#f0a500;margin:8px 0 4px 0;">Feedback Submitted</h2>
-<p style="color:#8b949e;font-size:0.85rem;margin:0;">Ticket ID: #{t['ticket_id'][:8].upper()}</p></div>
-<div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:20px;margin-bottom:16px;">
-<p style="color:#8b949e;font-size:0.8rem;text-transform:uppercase;margin:0 0 8px 0;">Rating</p>
-<p style="font-size:1.5rem;margin:0 0 16px 0;">{stars} ({rating}/5)</p>
-<p style="color:#8b949e;font-size:0.8rem;text-transform:uppercase;margin:0 0 8px 0;">Comments</p>
-<p style="color:#e6edf3;margin:0;line-height:1.6;">{comments if comments else "No comments provided."}</p></div>
-<p style="color:#8b949e;font-size:0.8rem;text-align:center;">Action taken by: {t.get('assigned_to', 'N/A')}</p></div>"""
-    recipient = DEPT_EMAILS.get(t.get('assigned_to',''), NOTIFY_EMAILS)
-    send_email(recipient, subj, html, cc=CC_EMAILS)
-
-def email_reraise(t):
-    subj = f"[MPDR] 🔄 Ticket #{t['ticket_id'][:8].upper()} Re-raised"
-    html = f"""<div style="font-family:Arial,sans-serif;background:#0d1117;color:#e6edf3;padding:30px;border-radius:12px;max-width:600px;margin:0 auto;">
-<div style="text-align:center;margin-bottom:24px;"><div style="font-size:2rem;">🔄</div>
-<h2 style="color:#ff7b72;margin:8px 0 4px 0;">Ticket Re-raised</h2>
-<p style="color:#8b949e;font-size:0.85rem;margin:0;">A user has re-opened a resolved/closed ticket</p></div>
-<div style="background:#161b22;border:1px solid #21262d;border-left:4px solid #ff7b72;border-radius:10px;padding:20px;margin-bottom:16px;">
-<p style="margin:0;font-weight:600;">Ticket: {t['title']}</p>
-<p style="margin:8px 0 0 0;color:#8b949e;font-size:0.9rem;">The user reported that the issue is still not fully resolved. Please review.</p></div>
-<p style="color:#8b949e;font-size:0.8rem;text-align:center;">Login to manage this ticket.</p></div>"""
-    recipient = DEPT_EMAILS.get(t.get('assigned_to',''), NOTIFY_EMAILS)
-    send_email(recipient, subj, html, cc=CC_EMAILS)
-
 @st.cache_data(ttl=60, show_spinner=False)
 def all_feedback():
     try:
@@ -465,9 +397,6 @@ def submit_fb(tid,by,rating,comments):
     ws.append_row([tid,by,rating,comments,now_ist().strftime("%Y-%m-%d %H:%M:%S")])
     update_ticket(tid,"CLOSED")
     all_feedback.clear()
-    ws_t, row, t = find_row(tid)
-    if t:
-        email_feedback(t, rating, comments)
 
 @st.cache_data(ttl=60, show_spinner=False)
 def all_ticket_comments():
@@ -531,10 +460,6 @@ def sla_badge(info):
             f'{icon} {s} &middot; {time_str}</span>')
 
 def email_sla_warning(t):
-    recipient = DEPT_EMAILS.get(t.get('assigned_to',''), NOTIFY_EMAILS)
-    if isinstance(recipient, str):
-        recipient = [recipient]
-        
     subj = f"[MPDR] ⚠️ SLA Warning: Ticket #{t['ticket_id'][:8].upper()} at 75% Time"
     html = f"""<div style="font-family:Arial,sans-serif;background:#0d1117;color:#e6edf3;padding:30px;border-radius:12px;max-width:600px;margin:0 auto;">
 <div style="text-align:center;margin-bottom:24px;"><div style="font-size:2.5rem;">⚠️</div>
@@ -548,7 +473,7 @@ def email_sla_warning(t):
 <tr><td style="color:#8b949e;font-size:0.82rem;padding:6px 0;">PRIORITY</td><td><span style="background:#4d1a00;color:#ff7b72;padding:2px 8px;border-radius:10px;font-size:0.78rem;font-weight:600;">{t['priority']}</span></td></tr>
 </table></div>
 <p style="color:#8b949e;font-size:0.8rem;text-align:center;">MPDR Issue Tracker · Proprietary Drug Research Pvt. Ltd.</p></div>"""
-    return send_email(recipient, subj, html, cc=CC_EMAILS)
+    return send_email("admin@morepenpdr.com", subj, html)
 
 @st.cache_data(ttl=300, show_spinner=False)
 def check_sla_warnings(_tickets):
@@ -769,7 +694,7 @@ def page_create():
             a,b,c,d=st.columns(4)
             with a: cat =st.selectbox("Category *",["Equipment Failure","Software Issue","Safety Concern","Chemical Handling","Facility Problem","Network / IT","Documentation","Other"])
             with b: prio=st.selectbox("Priority *",["Low","Medium","High","Critical"])
-            with c: dept=st.selectbox("Assign To *", list(ARE_DATA.keys()))
+            with c: dept=st.selectbox("Assign To *",["IT","Lab Maintenance","HR","Safety"])
             with d: r_dept=st.selectbox("Your Department *", ["CADD", "API", "MedChem", "AR&D", "QA/QC"])
             st.markdown("<br>",unsafe_allow_html=True)
             sub=st.form_submit_button("🚀  Submit Ticket",use_container_width=True)
@@ -778,7 +703,7 @@ def page_create():
             else:
                 with st.spinner("Submitting and notifying..."):
                     tid=create_ticket(title.strip(),desc.strip(),cat,prio,dept,st.session_state.email,r_dept)
-                dept_email = ", ".join(DEPT_EMAILS.get(dept, ["admin@morepenpdr.com"]))
+                dept_email = DEPT_EMAILS.get(dept, "admin@morepenpdr.com")
                 st.success(f"✅ **Ticket submitted!** ID: `#{tid[:8].upper()}` · Notification sent to {dept_email}")
     with c2:
         st.markdown("""<div class="info-card"><p style="color:#000000;font-weight:700;margin:0 0 12px 0;">📌 ATT - Acceptable Turn-around Time</p>
@@ -813,7 +738,6 @@ def page_create():
 
 def page_my_tickets():
     st.markdown('<div class="page-header"><div class="page-title">📋 My Tickets</div><div class="page-sub">Track all issues you have reported</div></div>',unsafe_allow_html=True)
-    st.markdown("<br>" + render_ares_table(),unsafe_allow_html=True)
     tickets=[t for t in all_tickets() if t["created_by"]==st.session_state.email]
     if not tickets: st.info("No tickets yet. Click New Ticket to report an issue."); return
 
@@ -830,7 +754,7 @@ def page_my_tickets():
     c1,c2,c3=st.columns(3)
     with c1: sf=st.selectbox("Status",["All","OPEN","ASSIGNED","IN_PROGRESS","RESOLVED","CLOSED"])
     with c2: pf2=st.selectbox("Priority",["All","Critical","High","Medium","Low"])
-    with c3: df=st.selectbox("Department",["All"] + list(ARE_DATA.keys()))
+    with c3: df=st.selectbox("Department",["All","IT","Lab Maintenance","HR","Safety"])
     filtered=list(reversed(tickets))
     if sf!="All": filtered=[t for t in filtered if t["status"]==sf]
     if pf2!="All": filtered=[t for t in filtered if t["priority"]==pf2]
@@ -869,9 +793,6 @@ def page_my_tickets():
                 st.write("If you feel the issue was not fully solved, you can re-raise this ticket.")
                 if st.button("Re-raise Ticket", key=f"rr_{t['ticket_id']}"):
                     update_ticket(t["ticket_id"], "OPEN", "Re-raised by user")
-                    ws_t, row, t2 = find_row(t["ticket_id"])
-                    if t2:
-                        email_reraise(t2)
                     st.success("✅ Ticket re-raised successfully!")
                     st.rerun()
 
@@ -946,7 +867,6 @@ def page_resolved():
     depts = st.session_state.get("depts", [])
     dept_str = " & ".join(depts) if depts else "Department"
     st.markdown(f'<div class="page-header"><div class="page-title">✅ Resolved — {dept_str}</div><div class="page-sub">Tickets your department has resolved</div></div>',unsafe_allow_html=True)
-    st.markdown("<br>" + render_ares_table(),unsafe_allow_html=True)
     tickets=[t for t in all_tickets() if t["assigned_to"] in depts and t["status"] in ["RESOLVED","CLOSED"]]
     if not tickets: st.info("No resolved tickets yet."); return
     fbs={f["ticket_id"]:f for f in all_feedback()}
@@ -1062,36 +982,48 @@ def page_dashboard():
 </div></div>""",unsafe_allow_html=True)
 
 def page_manage_ares():
-    st.markdown('<div class="page-header"><div class="page-title">🏢 Admin Representative Employees (AREs)</div><div class="page-sub">View current responsibility assignments</div></div>',unsafe_allow_html=True)
+    st.markdown('<div class="page-header"><div class="page-title">🏢 Manage AREs</div><div class="page-sub">Add, edit, or remove Admin Representative Employees</div></div>',unsafe_allow_html=True)
     recs = get_ares()
     df = pd.DataFrame(recs)
     
-    st.info("ℹ️ ARE data is now managed directly in the code for better reliability. To change these details, edit the `ARE_DATA` dictionary in `app.py`.")
+    st.info("💡 You can edit cells directly. Click empty rows at the bottom to add new members, or select rows and press delete to remove them.")
     
-    st.dataframe(
+    edited_df = st.data_editor(
         df,
+        num_rows="dynamic",
         use_container_width=True,
         column_config={
-            "Category": "Department",
-            "Name": "Name",
-            "Responsibility": "Responsibility",
-            "Email": "Email",
-            "Phone": "Phone",
-            "Icon": "Icon"
+            "Category": st.column_config.TextColumn("Category (e.g. IT, HR)", required=True),
+            "Name": st.column_config.TextColumn("Name", required=True),
+            "Responsibility": st.column_config.TextColumn("Responsibility", required=True),
+            "Email": st.column_config.TextColumn("Valid e-mail", required=True),
+            "Phone": st.column_config.TextColumn("Phone Number", required=True),
+            "Icon": st.column_config.TextColumn("Emoji Title Icon (e.g. 🧪)")
         }
     )
+    
+    if st.button("💾 Save AREs Data"):
+        with st.spinner("Saving changes..."):
+            client = get_client().open("MPDR Issue Tracker")
+            ws = client.worksheet("ares")
+            ws.clear()
+            headers = edited_df.columns.tolist()
+            ws.append_row(headers)
+            values = edited_df.fillna("").values.tolist()
+            if values:
+                ws.append_rows(values)
+            get_ares.clear()
+            st.success("✅ AREs directory updated successfully! The new data is now live.")
+            st.rerun()
 
 def page_all_tickets():
     st.markdown('<div class="page-header"><div class="page-title">📋 All Tickets</div><div class="page-sub">Complete view of every ticket in the system</div></div>',unsafe_allow_html=True)
-    st.markdown("<br>" + render_ares_table(),unsafe_allow_html=True)
     tickets=all_tickets()
     if not tickets: st.info("No tickets yet."); return
     c1,c2,c3,c4=st.columns(4)
     with c1: sf=st.selectbox("Status",["All","OPEN","ASSIGNED","IN_PROGRESS","RESOLVED","CLOSED"])
     with c2: pf=st.selectbox("Priority",["All","Critical","High","Medium","Low"])
-    with c3:
-        dept_opts = ["All"] + list(ARE_DATA.keys())
-        df2=st.selectbox("Department", dept_opts)
+    with c3: df2=st.selectbox("Department",["All","IT","Lab Maintenance","HR","Safety"])
     with c4: srch=st.text_input("🔍 Search",placeholder="Title or reporter...")
     filtered=tickets
     if sf!="All": filtered=[t for t in filtered if t["status"]==sf]
