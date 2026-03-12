@@ -78,6 +78,13 @@ section[data-testid="stSidebar"] .stButton button:hover { background:rgba(56,182
 .streamlit-expanderHeader { background:#e8f4ff !important; border:1px solid #b3d9ff !important; border-radius:8px !important; color:#0d2d5e !important; font-weight:600 !important; padding-right:2.5rem !important; overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; }
 .streamlit-expanderContent { background:#f8fbff !important; border:1px solid #b3d9ff !important; border-top:none !important; }
 
+/* AREs Expander Special Styling */
+.ares-expander > div > div {
+    background: linear-gradient(135deg, #e0f2fe 0%, #ffffff 100%) !important;
+    border-left: 5px solid #0284c7 !important;
+    border-radius: 12px 12px 0 0 !important;
+}
+
 .stDataFrame { border:1px solid #b3d9ff !important; border-radius:10px !important; }
 .alert-success { background:#dcfce7; border:1px solid #86efac; border-radius:10px; padding:1rem 1.2rem; color:#166534; font-size:0.9rem; margin:0.5rem 0; }
 .alert-warning { background:#fff3cd; border:1px solid #fcd34d; border-radius:10px; padding:1rem 1.2rem; color:#b45309; font-size:0.9rem; margin:0.5rem 0; }
@@ -114,7 +121,7 @@ CC_EMAILS = ["admin@morepenpdr.com", "deepa.g@morepenpdr.com"]
 
 # --- ARE DATA (Admin Representative Employees) ---
 # Edit this dictionary to change responsibilities, concerns, emails, or phone numbers.
-# The routing and the UI table will update automatically .
+# The routing and the UI table will update automatically.
 ARE_DATA = {
     "Admin": {
         "Responsibility": "Office administration, facility management, stationery, vendor coordination, transport arrangements",
@@ -195,16 +202,15 @@ def get_ares():
 
 def render_ares_table():
     html = """
-<div style="background:#e0f2fe; border:1px solid #bae6fd; border-radius:12px; padding:20px; overflow-x:auto; margin-bottom:20px; color:#000000;">
-<h3 style="color:#0369a1; margin-top:0; font-size:1.1rem; border-bottom:1px solid #bae6fd; padding-bottom:10px;">🛡️ AREs – Administrative Responsible Entities</h3>
-<table style="width:100%; border-collapse:collapse; color:#000000; font-size:0.85rem; text-align:left;">
+<div style="background:transparent; padding:10px; overflow-x:auto; color:#000000;">
+<table style="width:100%; border-collapse:collapse; color:#000000; font-size:0.95rem; text-align:left;">
 <thead>
-<tr style="border-bottom:2px solid #bae6fd; color:#0369a1; text-transform:uppercase; font-size:0.75rem;">
-<th style="padding:10px 5px;">Department</th>
-<th style="padding:10px 5px;">Responsibility</th>
-<th style="padding:10px 5px;">Concerned Person</th>
-<th style="padding:10px 5px;">Email</th>
-<th style="padding:10px 5px;">Phone Number</th>
+<tr style="border-bottom:3px solid #0284c7; color:#0369a1; text-transform:uppercase; font-size:1rem; font-weight:700; text-align:center;">
+<th style="padding:15px 10px; text-align:left;">Department</th>
+<th style="padding:15px 10px;">Responsibility</th>
+<th style="padding:15px 10px;">Concerned Person</th>
+<th style="padding:15px 10px;">Email</th>
+<th style="padding:15px 10px;">Phone Number</th>
 </tr>
 </thead>
 <tbody>
@@ -213,19 +219,21 @@ def render_ares_table():
         email_display = ", ".join(info['Email'])
         html += f"""
 <tr style="border-bottom:1px solid #bae6fd;">
-<td style="padding:12px 5px; font-weight:600; color:#0369a1;">{info['Icon']} {dept}</td>
-<td style="padding:12px 5px; color:#334155; font-size:0.8rem; line-height:1.4;">{info['Responsibility']}</td>
-<td style="padding:12px 5px;">{info['Concerned Person']}</td>
-<td style="padding:12px 5px;"><a href="mailto:{email_display}" style="color:#0284c7; text-decoration:none; font-weight:500;">{email_display}</a></td>
-<td style="padding:12px 5px; color:#9a3412; font-family:monospace; font-weight:600;">{info['Phone']}</td>
+<td style="padding:18px 10px; font-weight:700; color:#0369a1; font-size:1.05rem;">{info['Icon']} {dept}</td>
+<td style="padding:18px 10px; color:#020617; font-size:0.95rem; line-height:1.5; font-weight:500;">{info['Responsibility']}</td>
+<td style="padding:18px 10px; color:#020617; font-weight:700; font-size:1.05rem; text-align:center;">{info['Concerned Person']}</td>
+<td style="padding:18px 10px; text-align:center;"><a href="mailto:{email_display}" style="color:#0284c7; text-decoration:none; font-weight:600;">{email_display}</a></td>
+<td style="padding:18px 10px; color:#9a3412; font-family:monospace; font-weight:700; text-align:center;">{info['Phone']}</td>
 </tr>
 """
     html += "</tbody></table></div>"
     return html
 
 def render_ares_ui():
-    with st.expander("🛡️ Administrative Responsible Employees (AREs) Contact List", expanded=False):
+    st.markdown('<div class="ares-expander">', unsafe_allow_html=True)
+    with st.expander("🛡️ Administrative Responsible Entities (AREs) Contact List", expanded=False):
         st.markdown(render_ares_table(), unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # Status transitions
 ALLOWED_TRANSITIONS = {
@@ -772,7 +780,16 @@ def page_create():
             title=st.text_input("Issue Title *",placeholder="e.g. HPLC system not responding in Lab 3")
             desc =st.text_area("Detailed Description *",placeholder="Describe the issue clearly...",height=140)
             a,b,c,d=st.columns(4)
-            with a: cat =st.selectbox("Category *",["Equipment Failure","Software Issue","Safety Concern","Chemical Handling","Facility Problem","Network / IT","Documentation","Other"])
+            with a: 
+                cats = [
+                    "Equipment Failure", "Software Issue", "Network / IT", "Hardware Repair",
+                    "Payroll Query", "Leave/Attendance", "Recruitment", "Onboarding",
+                    "Stationery Request", "Transport Arrangement", "Vendor Coordination",
+                    "Lab Cleaning", "General Housekeeping", "Waste Disposal",
+                    "Security Access", "Security Incident", "CCTV Request",
+                    "Chemical Handling", "Safety Concern", "Documentation", "Other"
+                ]
+                cat =st.selectbox("Category *", cats)
             with b: prio=st.selectbox("Priority *",["Low","Medium","High","Critical"])
             with c: dept=st.selectbox("Assign To *", list(ARE_DATA.keys()))
             with d: r_dept=st.selectbox("Your Department *", ["CADD", "API", "MedChem", "AR&D", "QA/QC"])
