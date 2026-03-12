@@ -696,7 +696,7 @@ def login_page():
                 rp2=st.text_input("Confirm Password",type="password",key="re_p2")
                 rr=st.selectbox("Role",["scientist","admin","management"],key="re_r")
                 rd=""
-                if rr=="admin": rd=st.selectbox("Department",["IT","Lab Maintenance","Safety","HR"],key="re_d")
+                if rr=="admin": rd=st.selectbox("Department", list(ARE_DATA.keys()), key="re_d")
                 st.markdown("<br>",unsafe_allow_html=True)
                 if st.button("Send OTP →",use_container_width=True,key="btn_re_otp"):
                     if not re.endswith("@morepenpdr.com"): st.error("⛔ Only @morepenpdr.com emails allowed.")
