@@ -124,38 +124,38 @@ ARE_DATA = {
         "Icon": "🏢"
     },
     "HR": {
-        "Responsibility": "Recruitment, employee onboarding, attendance, payroll coordination, policy compliance",
-        "Concerned Person": "Deepa G",
-        "Email": ["deepa.g@morepenpdr.com"],
-        "Phone": "9247527626",
+        "Responsibility": "Recruitment, employee onboarding/offboarding, payroll, leave management, employee relations",
+        "Concerned Person": "Nikhitha",
+        "Email": ["hr@morepenpdr.com"],
+        "Phone": "6302451459",
         "Icon": "👥"
     },
     "IT": {
-        "Responsibility": "Computer systems, network connectivity, software troubleshooting, hardware maintenance, system access",
-        "Concerned Person": "Narendra S",
+        "Responsibility": "System setup, network management, software installation, troubleshooting computers and servers",
+        "Concerned Person": "Narendra",
         "Email": ["admin@morepenpdr.com", "narendra.s@morepenpdr.com"],
-        "Phone": "9247527627",
+        "Phone": "8106107921",
         "Icon": "💻"
     },
     "Lab Maintenance": {
-        "Responsibility": "Lab equipment servicing, AMC management, glassware supply, gas cylinder management",
-        "Concerned Person": "Vamsi M",
-        "Email": ["admin@morepenpdr.com", "vamsi.m@morepenpdr.com"],
-        "Phone": "9247527628",
+        "Responsibility": "Laboratory equipment maintenance, calibration coordination, instrument troubleshooting, lab infrastructure support",
+        "Concerned Person": "Narendra, Srilekha",
+        "Email": ["narendra.s@morepenpdr.com"],
+        "Phone": "8106107921, 7569263011",
         "Icon": "🛠️"
     },
     "House Keeping": {
-        "Responsibility": "Cleaning services, waste management, cafeteria oversight, general sanitation",
-        "Concerned Person": "Rahul Swamy",
-        "Email": ["admin@morepenpdr.com"],
-        "Phone": "9247527629",
+        "Responsibility": "Office and laboratory cleaning, waste disposal, maintaining hygiene and cleanliness of premises",
+        "Concerned Person": "Manisha, Mahesh",
+        "Email": ["manisha.s@morepenpdr.com"],
+        "Phone": "6300535593",
         "Icon": "🧹"
     },
     "Security": {
-        "Responsibility": "Access control, visitor logs, surveillance monitoring, night shift protocols, perimeter safety",
-        "Concerned Person": "Rahul Swamy",
-        "Email": ["admin@morepenpdr.com"],
-        "Phone": "9247527630",
+        "Responsibility": "Premises security, visitor management, access control, monitoring entry/exit and safety",
+        "Concerned Person": "In-line security",
+        "Email": ["security@morepenpdr.com"],
+        "Phone": "9247527628",
         "Icon": "🛡️"
     }
 }
