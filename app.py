@@ -259,6 +259,27 @@ def log_ticket_history(tid, old_status, new_status, by, notes=""):
     ws = get_or_create_sheet("ticket_history", ["ticket_id", "old_status", "new_status", "updated_by", "timestamp", "notes"])
     ws.append_row([tid, old_status, new_status, by, now_ist().strftime("%Y-%m-%d %H:%M:%S"), notes])
 
+def send_otp_email(to_email, otp):
+    """Sends a verification OTP via email using a premium template."""
+    subj = f"[MPDR] {otp} is your verification code"
+    html = f"""<div style="font-family:Arial,sans-serif;background:#0d1117;color:#e6edf3;padding:30px;border-radius:12px;max-width:500px;margin:0 auto;border:1px solid #30363d;">
+<div style="text-align:center;margin-bottom:24px;">
+    <div style="font-size:2.5rem;margin-bottom:10px;">🔒</div>
+    <h2 style="color:#58a6ff;margin:0;">Verification Code</h2>
+    <p style="color:#8b949e;font-size:0.9rem;margin-top:5px;">Secure access to MPDR Issue Tracker</p>
+</div>
+<div style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:30px;text-align:center;margin-bottom:20px;">
+    <p style="color:#8b949e;font-size:0.8rem;text-transform:uppercase;margin-bottom:10px;letter-spacing:1px;">Your OTP Code</p>
+    <div style="font-size:3rem;font-weight:700;color:#ffffff;letter-spacing:8px;margin:10px 0;">{otp}</div>
+    <p style="color:#8b949e;font-size:0.75rem;margin-top:15px;">Valid for the next 10 minutes. Do not share this code.</p>
+</div>
+<p style="color:#8b949e;font-size:0.75rem;text-align:center;line-height:1.4;">If you didn't request this code, you can safely ignore this email.</p>
+<div style="border-top:1px solid #21262d;margin-top:25px;padding-top:15px;text-align:center;">
+    <p style="color:#484f58;font-size:0.7rem;">Morepen Proprietary Drug Research Pvt. Ltd. &copy; 2026</p>
+</div>
+</div>"""
+    return send_email(to_email, subj, html)
+
 
 def send_email(to_list, subject, html_body, cc=None):
     try:
@@ -339,22 +360,39 @@ def email_resolved(t):
     send_email([t['created_by']], subj, html, cc=CC_EMAILS)
 
 @st.cache_data(ttl=60, show_spinner=False)
-def all_users():    return safe_get_all_records(sheet("users"))
-def get_user(e):    return next((u for u in all_users() if u["email"]==e), None)
-def register_user(email,password,role,dept=""):
-    h = bcrypt.hashpw(password.encode(),bcrypt.gensalt()).decode()
-    sheet("users").append_row([email,h,role,dept,now_ist().strftime("%Y-%m-%d %H:%M:%S")])
-    all_users.clear()
-def check_pw(pw,h): return bcrypt.checkpw(pw.encode(),h.encode())
-def update_user_password(email, new_password):
+def all_users():
+    try:
+        ws = sheet("users")
+        return safe_get_all_records(ws)
+    except: return []
+
+def get_user(e):
+    users = all_users()
+    return next((u for u in users if str(u.get("email")).lower() == str(e).lower()), None)
+
+def register_user(email, password, role, dept=""):
+    h = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     ws = sheet("users")
-    recs = ws.get_all_records()
-    for i, r in enumerate(recs):
-        if r["email"] == email:
-            h = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
-            ws.update_cell(i + 2, 2, h)
-            all_users.clear()
-            return True
+    ws.append_row([email.lower(), h, role, dept, now_ist().strftime("%Y-%m-%d %H:%M:%S")])
+    all_users.clear()
+
+def check_pw(pw, h):
+    try: return bcrypt.checkpw(pw.encode(), h.encode())
+    except: return False
+
+def update_user_password(email, new_password):
+    try:
+        ws = sheet("users")
+        recs = ws.get_all_records()
+        for i, r in enumerate(recs):
+            if str(r.get("email")).lower() == str(email).lower():
+                h = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+                # Assuming email is col 1, password is col 2 (1-indexed)
+                ws.update_cell(i + 2, 2, h)
+                all_users.clear()
+                return True
+    except Exception as e:
+        st.error(f"Error updating password: {e}")
     return False
 
 @st.cache_data(ttl=60, show_spinner=False)
