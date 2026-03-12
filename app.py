@@ -195,31 +195,31 @@ def get_ares():
 
 def render_ares_table():
     html = """
-    <div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:20px; overflow-x:auto; margin-bottom:20px;">
-    <h3 style="color:#58a6ff; margin-top:0; font-size:1.1rem; border-bottom:1px solid #30363d; padding-bottom:10px;">🛡️ AREs – Administrative Responsible Entities</h3>
-    <table style="width:100%; border-collapse:collapse; color:#e6edf3; font-size:0.85rem; text-align:left;">
-    <thead>
-        <tr style="border-bottom:1px solid #30363d; color:#8b949e; text-transform:uppercase; font-size:0.75rem;">
-            <th style="padding:10px 5px;">Department</th>
-            <th style="padding:10px 5px;">Responsibility</th>
-            <th style="padding:10px 5px;">Concerned Person</th>
-            <th style="padding:10px 5px;">Email</th>
-            <th style="padding:10px 5px;">Phone Number</th>
-        </tr>
-    </thead>
-    <tbody>
-    """
+<div style="background:#161b22; border:1px solid #30363d; border-radius:12px; padding:20px; overflow-x:auto; margin-bottom:20px;">
+<h3 style="color:#58a6ff; margin-top:0; font-size:1.1rem; border-bottom:1px solid #30363d; padding-bottom:10px;">🛡️ AREs – Administrative Responsible Entities</h3>
+<table style="width:100%; border-collapse:collapse; color:#e6edf3; font-size:0.85rem; text-align:left;">
+<thead>
+<tr style="border-bottom:1px solid #30363d; color:#8b949e; text-transform:uppercase; font-size:0.75rem;">
+<th style="padding:10px 5px;">Department</th>
+<th style="padding:10px 5px;">Responsibility</th>
+<th style="padding:10px 5px;">Concerned Person</th>
+<th style="padding:10px 5px;">Email</th>
+<th style="padding:10px 5px;">Phone Number</th>
+</tr>
+</thead>
+<tbody>
+"""
     for dept, info in ARE_DATA.items():
         email_display = ", ".join(info['Email'])
         html += f"""
-        <tr style="border-bottom:1px solid #21262d;">
-            <td style="padding:12px 5px; font-weight:600; color:#58a6ff;">{info['Icon']} {dept}</td>
-            <td style="padding:12px 5px; color:#8b949e; font-size:0.8rem; line-height:1.4;">{info['Responsibility']}</td>
-            <td style="padding:12px 5px;">{info['Concerned Person']}</td>
-            <td style="padding:12px 5px;"><a href="mailto:{email_display}" style="color:#58a6ff; text-decoration:none;">{email_display}</a></td>
-            <td style="padding:12px 5px; color:#f0a500; font-family:monospace;">{info['Phone']}</td>
-        </tr>
-        """
+<tr style="border-bottom:1px solid #21262d;">
+<td style="padding:12px 5px; font-weight:600; color:#58a6ff;">{info['Icon']} {dept}</td>
+<td style="padding:12px 5px; color:#8b949e; font-size:0.8rem; line-height:1.4;">{info['Responsibility']}</td>
+<td style="padding:12px 5px;">{info['Concerned Person']}</td>
+<td style="padding:12px 5px;"><a href="mailto:{email_display}" style="color:#58a6ff; text-decoration:none;">{email_display}</a></td>
+<td style="padding:12px 5px; color:#f0a500; font-family:monospace;">{info['Phone']}</td>
+</tr>
+"""
     html += "</tbody></table></div>"
     return html
 
