@@ -853,7 +853,7 @@ def page_create():
   <tbody>
     <tr style="border-bottom:1px solid #c8e3ff;">
       <td style="padding:4px;"><span class="badge b-critical" style="background:#fca5a5;">Critical</span></td>
-      <td style="padding:4px; color:#000000; font-weight:500;">24hrs</td>
+      <td style="padding:4px; color:#000000; font-weight:500;">4hrs</td>
     </tr>
     <tr style="border-bottom:1px solid #c8e3ff;">
       <td style="padding:4px;"><span class="badge b-high">High</span></td>
