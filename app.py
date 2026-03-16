@@ -824,7 +824,7 @@ def page_create():
                     "Payroll Query", "Leave/Attendance", "Recruitment", "Onboarding",
                     "Stationery Request", "Transport Arrangement", "Vendor Coordination",
                     "Lab Cleaning", "General Housekeeping", "Waste Disposal",
-                    "Security Access", "Security Incident", "CCTV Request", "Gate Pass"
+                    "Security Access", "Security Incident", "CCTV Request", "Gate Pass",
                     "Chemical Handling", "Safety Concern", "Documentation", "Other"
                 ]
                 cat =st.selectbox("Category *", cats)
