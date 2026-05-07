@@ -164,20 +164,6 @@ ARE_DATA = {
         "Email": ["security@morepenpdr.com"],
         "Phone": "9247527628",
         "Icon": "🛡️"
-    },
-    "SSD": {
-        "Responsibility": "Solid State Development related tasks",
-        "Concerned Person": "SSD Team",
-        "Email": ["admin@morepenpdr.com"],
-        "Phone": "-",
-        "Icon": "🔬"
-    },
-    "CDMO": {
-        "Responsibility": "Contract Development and Manufacturing related tasks",
-        "Concerned Person": "CDMO Team",
-        "Email": ["admin@morepenpdr.com"],
-        "Phone": "-",
-        "Icon": "🏭"
     }
 }
 
@@ -383,6 +369,27 @@ def all_users():
 def get_user(e):
     users = all_users()
     return next((u for u in users if str(u.get("email")).lower() == str(e).lower()), None)
+
+def get_authorized_departments(user_email, user_role, registered_department):
+    depts = []
+    user_email = str(user_email).strip().lower()
+    
+    if user_role == "admin":
+        for d, e in DEPT_EMAILS.items():
+            if isinstance(e, list):
+                if any(user_email == str(em).strip().lower() for em in e):
+                    depts.append(d)
+            else:
+                if user_email == str(e).strip().lower():
+                    depts.append(d)
+    
+    reg_dept_str = str(registered_department)
+    if reg_dept_str:
+        for rd in reg_dept_str.split(","):
+            rd = rd.strip()
+            if rd and rd not in depts:
+                depts.append(rd)
+    return depts
 
 def register_user(email, password, role, dept=""):
     h = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -687,17 +694,7 @@ def login_page():
                         st.session_state.logged_in=True; st.session_state.email=email
                         st.session_state.role=u["role"]; st.session_state.dept=u["department"]
                         
-                        depts = []
-                        if u["role"] == "admin":
-                            if email.lower() == "hr@morepenpdr.com":
-                                depts = ["HR"]
-                            elif email.lower() == "admin@morepenpdr.com":
-                                depts = ["Lab Maintenance"]
-                            elif email.lower() == "narendra.s@morepenpdr.com":
-                                depts = ["IT", "Safety"]
-                            elif u.get("department"):
-                                depts = [d.strip() for d in str(u["department"]).split(",") if d.strip()]
-                        st.session_state.depts = depts
+                        st.session_state.depts = get_authorized_departments(email, u.get("role", ""), u.get("department", ""))
                         
                         st.session_state.page="home"; st.rerun()
                     else: st.error("Invalid email or password.")
