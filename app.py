@@ -375,13 +375,16 @@ def get_authorized_departments(user_email, user_role, registered_department):
     user_email = str(user_email).strip().lower()
     
     if user_role == "admin":
-        for d, e in DEPT_EMAILS.items():
-            if isinstance(e, list):
-                if any(user_email == str(em).strip().lower() for em in e):
-                    depts.append(d)
-            else:
-                if user_email == str(e).strip().lower():
-                    depts.append(d)
+        if user_email == "admin@morepenpdr.com":
+            depts = ["Admin"]
+        elif user_email == "narendra.s@morepenpdr.com":
+            depts = ["IT", "Lab Maintenance"]
+        elif user_email == "hr@morepenpdr.com":
+            depts = ["HR"]
+        elif user_email == "manisha.s@morepenpdr.com":
+            depts = ["House Keeping"]
+        elif user_email == "security@morepenpdr.com":
+            depts = ["Security"]
     
     reg_dept_str = str(registered_department)
     if reg_dept_str:
