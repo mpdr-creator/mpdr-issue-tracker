@@ -1,0 +1,10 @@
+.streamlit/secrets.toml
+__pycache__/
+*.pyc
+.env
+.DS_Store
+mpdr-ims-*.json
+secrets.toml
+Backup-codes-*.txt
+*.zip
+*.pptx

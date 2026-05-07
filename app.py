@@ -19,7 +19,7 @@ import uuid
 import plotly.express as px
 import pandas as pd
 
-st.set_page_config(page_title="MPDR Issue Management System", page_icon="🔬", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="MPDR Information Management System", page_icon="🔬", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
 <style>
@@ -164,6 +164,20 @@ ARE_DATA = {
         "Email": ["security@morepenpdr.com"],
         "Phone": "9247527628",
         "Icon": "🛡️"
+    },
+    "SSD": {
+        "Responsibility": "Solid State Development related tasks",
+        "Concerned Person": "SSD Team",
+        "Email": ["admin@morepenpdr.com"],
+        "Phone": "-",
+        "Icon": "🔬"
+    },
+    "CDMO": {
+        "Responsibility": "Contract Development and Manufacturing related tasks",
+        "Concerned Person": "CDMO Team",
+        "Email": ["admin@morepenpdr.com"],
+        "Phone": "-",
+        "Icon": "🏭"
     }
 }
 
@@ -697,6 +711,7 @@ def login_page():
                 rr=st.selectbox("Role",["scientist","admin","management"],key="re_r")
                 rd=""
                 if rr=="admin": rd=st.selectbox("Department", list(ARE_DATA.keys()), key="re_d")
+                elif rr=="scientist": rd=st.selectbox("Department", ["CADD", "API", "MedChem", "AR&D", "QA/QC", "SSD", "CDMO"], key="re_d_sci")
                 st.markdown("<br>",unsafe_allow_html=True)
                 if st.button("Send OTP →",use_container_width=True,key="btn_re_otp"):
                     if not re.endswith("@morepenpdr.com"): st.error("⛔ Only @morepenpdr.com emails allowed.")
@@ -824,13 +839,13 @@ def page_create():
                     "Payroll Query", "Leave/Attendance", "Recruitment", "Onboarding",
                     "Stationery Request", "Transport Arrangement", "Vendor Coordination",
                     "Lab Cleaning", "General Housekeeping", "Waste Disposal",
-                    "Security Access", "Security Incident", "CCTV Request", "Gate Pass",
+                    "Security Access", "Security Incident", "CCTV Request", "Gate pass",
                     "Chemical Handling", "Safety Concern", "Documentation", "Other"
                 ]
                 cat =st.selectbox("Category *", cats)
             with b: prio=st.selectbox("Priority *",["Low","Medium","High","Critical"])
             with c: dept=st.selectbox("Assign To *", list(ARE_DATA.keys()))
-            with d: r_dept=st.selectbox("Your Department *", ["CADD", "API", "MedChem", "AR&D", "QA/QC"])
+            with d: r_dept=st.selectbox("Your Department *", ["CADD", "API", "MedChem", "AR&D", "QA/QC", "SSD", "CDMO"])
             st.markdown("<br>",unsafe_allow_html=True)
             sub=st.form_submit_button("🚀  Submit Ticket",use_container_width=True)
         if sub:
@@ -853,7 +868,7 @@ def page_create():
   <tbody>
     <tr style="border-bottom:1px solid #c8e3ff;">
       <td style="padding:4px;"><span class="badge b-critical" style="background:#fca5a5;">Critical</span></td>
-      <td style="padding:4px; color:#000000; font-weight:500;">4hrs</td>
+      <td style="padding:4px; color:#000000; font-weight:500;">24hrs</td>
     </tr>
     <tr style="border-bottom:1px solid #c8e3ff;">
       <td style="padding:4px;"><span class="badge b-high">High</span></td>
