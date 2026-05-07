@@ -1,6 +1,6 @@
 streamlit
-bcrypt
-pandas
-plotly
 gspread
 google-auth
+bcrypt
+plotly
+pandas
