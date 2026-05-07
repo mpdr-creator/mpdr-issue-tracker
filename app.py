@@ -699,7 +699,7 @@ def login_page():
                         
                         st.session_state.depts = get_authorized_departments(email, u.get("role", ""), u.get("department", ""))
                         
-                        st.session_state.page="home"; st.rerun()
+                        st.session_state.app_mode="hub"; st.session_state.page="hub"; st.rerun()
                     else: st.error("Invalid email or password.")
 
         with t2:
@@ -794,6 +794,41 @@ def login_page():
 
 def render_sidebar():
     with st.sidebar:
+        if st.session_state.get("app_mode", "hub") == "hub":
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Sign Out",use_container_width=True):
+                st.session_state.clear()
+                st.rerun()
+            return
+
+        if st.button("🏠 Hub / Workspace", use_container_width=True, type="primary"):
+            st.session_state.app_mode = "hub"
+            st.session_state.page = "hub"
+            st.rerun()
+        st.markdown("<hr style='border-color:rgba(56,182,255,0.3);margin:1rem 0;'>",unsafe_allow_html=True)
+
+        if st.session_state.get("app_mode") == "hrms":
+            RC={"scientist":"#58a6ff","admin":"#f0a500","management":"#3fb950"}
+            color=RC.get(st.session_state.role,"#58a6ff")
+            st.markdown(f"""<div style="padding:1rem;border-bottom:1px solid rgba(56,182,255,0.3);text-align:center;">
+                <h3 style="margin:0;color:#0d2d5e;">👥 HRMS Portal</h3>
+                <p style="color:{color};font-weight:600;margin:0;">{st.session_state.role.title()}</p>
+                <p style="color:#64748b;font-size:0.8rem;margin:0;">{st.session_state.email}</p>
+            </div>""",unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("👤 My Profile & Info", use_container_width=True): st.session_state.page="hrms_profile"
+            if st.button("📝 My KRA", use_container_width=True): st.session_state.page="hrms_kra"
+            if st.session_state.role == "management" or st.session_state.email == "hr@morepenpdr.com":
+                st.markdown("<hr style='border-color:rgba(56,182,255,0.3);margin:1rem 0;'>",unsafe_allow_html=True)
+                if st.button("🏢 Employee DB", use_container_width=True): st.session_state.page="hrms_db"
+                if st.button("📊 KRA Assessments", use_container_width=True): st.session_state.page="hrms_assess"
+            
+            st.markdown("<hr style='border-color:rgba(56,182,255,0.3);margin:1rem 0;'>",unsafe_allow_html=True)
+            if st.button("Sign Out",use_container_width=True, key="so_hrms"):
+                st.session_state.clear()
+                st.rerun()
+            return
+
         RC={"scientist":"#58a6ff","admin":"#f0a500","management":"#3fb950"}
         RI={"scientist":"🧪","admin":"🛠️","management":"📊"}
         color=RC.get(st.session_state.role,"#58a6ff"); icon=RI.get(st.session_state.role,"👤")
@@ -1235,12 +1270,54 @@ def page_all_tickets():
         else:
             st.info("No resolved or closed tickets found.")
 
+def page_hub():
+    st.markdown("<h2 style='text-align:center; color:#0d2d5e;'>Select Workspace</h2>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col1, col2, col3, col4 = st.columns([1, 4, 4, 1])
+    with col2:
+        st.markdown("""<div style="background:white;border-radius:12px;padding:3rem;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.05);cursor:pointer;border:2px solid transparent;transition:all 0.3s ease;" onmouseover="this.style.borderColor='#38b6ff';this.style.transform='translateY(-5px)';" onmouseout="this.style.borderColor='transparent';this.style.transform='translateY(0)';">
+        <h1 style="font-size:4rem;margin:0;">🛠️</h1>
+        <h3 style="color:#0d2d5e;margin-top:1rem;">IMS Portal</h3>
+        <p style="color:#64748b;">Information Management System</p>
+        </div>""", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Enter IMS →", key="btn_enter_ims", use_container_width=True, type="primary"):
+            st.session_state.app_mode = "ims"
+            st.session_state.page = "home"
+            st.rerun()
+            
+    with col3:
+        st.markdown("""<div style="background:white;border-radius:12px;padding:3rem;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.05);cursor:pointer;border:2px solid transparent;transition:all 0.3s ease;" onmouseover="this.style.borderColor='#38b6ff';this.style.transform='translateY(-5px)';" onmouseout="this.style.borderColor='transparent';this.style.transform='translateY(0)';">
+        <h1 style="font-size:4rem;margin:0;">👥</h1>
+        <h3 style="color:#0d2d5e;margin-top:1rem;">HRMS Portal</h3>
+        <p style="color:#64748b;">Human Resources Management</p>
+        </div>""", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Enter HRMS →", key="btn_enter_hrms", use_container_width=True, type="primary"):
+            st.session_state.app_mode = "hrms"
+            st.session_state.page = "hrms_profile"
+            st.rerun()
+
 def main():
     if not st.session_state.logged_in:
         login_page(); return
     check_sla_warnings(all_tickets())
     render_sidebar()
     role=st.session_state.role; page=st.session_state.page
+
+    if st.session_state.get("app_mode", "hub") == "hub":
+        page_hub()
+        return
+
+    if st.session_state.get("app_mode") == "hrms":
+        import hrms
+        if page == "hrms_profile": hrms.page_hrms_profile(st, st.session_state, get_or_create_sheet, safe_get_all_records, now_ist)
+        elif page == "hrms_kra": hrms.page_hrms_kra(st, st.session_state, get_or_create_sheet, safe_get_all_records, now_ist)
+        elif page == "hrms_db": hrms.page_hrms_db(st, st.session_state, get_or_create_sheet, safe_get_all_records, now_ist)
+        elif page == "hrms_assess": hrms.page_hrms_assess(st, st.session_state, get_or_create_sheet, safe_get_all_records, now_ist)
+        else: hrms.page_hrms_profile(st, st.session_state, get_or_create_sheet, safe_get_all_records, now_ist)
+        return
+
     if role=="scientist":
         if page in ("home","create","login"): page_create()
         elif page=="my_tickets":             page_my_tickets()
