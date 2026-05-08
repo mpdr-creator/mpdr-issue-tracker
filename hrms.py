@@ -133,7 +133,7 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                     # Pass empty strings for removed fields
                     submit_kra(email, year, quarter, "", "", "", tech_data, get_or_create_sheet, safe_get_all_records, now_ist)
                 st.success("KRA submitted successfully!")
-                    st.rerun()
+                st.rerun()
                     
     with tab2:
         if not kras:
