@@ -285,7 +285,12 @@ def get_or_create_sheet(name, cols):
     if name not in [ws.title for ws in client.worksheets()]:
         ws = client.add_worksheet(title=name, rows=1000, cols=len(cols))
         ws.append_row(cols)
-    return client.worksheet(name)
+    ws = client.worksheet(name)
+    # Ensure headers match schema so get_all_records() works for all columns
+    existing = ws.row_values(1)
+    if len(existing) < len(cols):
+        ws.update("A1", [cols])
+    return ws
 
 def log_ticket_history(tid, old_status, new_status, by, notes=""):
     if old_status == new_status: return
