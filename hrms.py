@@ -50,11 +50,16 @@ def assess_kra(kra_id, notes, rating, get_or_create_sheet, safe_get_all_records,
 
 # UI Rendering functions
 def page_hrms_profile(st, session_state, get_or_create_sheet, safe_get_all_records, now_ist):
-    st.markdown("<h2 style='color:#0d2d5e;'>👤 My Profile & Info</h2>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class="page-header">
+        <div class="page-title">👤 My Profile & Info</div>
+        <div class="page-sub">Keep your personal and emergency contact information up to date</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     email = session_state.email
     if email == "hr@morepenpdr.com":
-        st.info("ℹ️ HR profiles are not required to fill personal information.")
+        st.markdown('<div class="alert-info">ℹ️ HR profiles are not required to fill personal information. Access the Employee Database to view other profiles.</div>', unsafe_allow_html=True)
         return
 
     profile = get_hrms_profile(email, get_or_create_sheet, safe_get_all_records)
@@ -88,7 +93,12 @@ def page_hrms_profile(st, session_state, get_or_create_sheet, safe_get_all_recor
                 st.rerun()
 
 def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, now_ist):
-    st.markdown("<h2 style='color:#0d2d5e;'>📝 My KRA Submission</h2>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class="page-header">
+        <div class="page-title">📝 KRA & Performance</div>
+        <div class="page-sub">Submit your Key Result Areas and track performance cycles</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     email = session_state.email
     kras = [k for k in all_hrms_kras(get_or_create_sheet, safe_get_all_records) if k.get("email") == email]
@@ -145,7 +155,12 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                 st.markdown("</div>", unsafe_allow_html=True)
 
 def page_hrms_db(st, session_state, get_or_create_sheet, safe_get_all_records, now_ist):
-    st.markdown("<h2 style='color:#0d2d5e;'>🏢 Employee Database</h2>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class="page-header">
+        <div class="page-title">🏢 Employee Database</div>
+        <div class="page-sub">Centralized directory of all company personnel</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     profiles = all_hrms_profiles(get_or_create_sheet, safe_get_all_records)
     if not profiles:
@@ -168,7 +183,12 @@ def page_hrms_db(st, session_state, get_or_create_sheet, safe_get_all_records, n
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_records, now_ist):
-    st.markdown("<h2 style='color:#0d2d5e;'>📊 KRA Assessments</h2>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class="page-header">
+        <div class="page-title">📊 KRA Assessments</div>
+        <div class="page-sub">Review and evaluate employee performance submissions</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     kras = all_hrms_kras(get_or_create_sheet, safe_get_all_records)
     if not kras:

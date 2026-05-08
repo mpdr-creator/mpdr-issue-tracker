@@ -26,7 +26,7 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 * { font-family: 'Inter', sans-serif !important; }
 
-.stApp { background: #f0f6ff !important; color: #0d2d5e !important; }
+.stApp { background: #f8fbff !important; color: #0d2d5e !important; }
 .main .block-container { padding:1.5rem 2rem 2rem 2rem; max-width:1400px; }
 
 section[data-testid="stSidebar"] { background: linear-gradient(180deg,#0d2d5e 0%,#1a4a8a 100%) !important; border-right:3px solid #38b6ff !important; }
@@ -39,8 +39,8 @@ section[data-testid="stSidebar"] .stButton button:hover { background:rgba(56,182
 .stat-label { font-size:0.82rem; color:#4a7ab5; margin-top:0.4rem; text-transform:uppercase; letter-spacing:0.05em; }
 
 .info-card { background:#ffffff; border:1px solid #c8e3ff; border-radius:12px; padding:1.2rem 1.4rem; margin-bottom:0.8rem; box-shadow:0 2px 8px rgba(13,45,94,0.06); }
-.ticket-card { background:#ffffff; border:1px solid #c8e3ff; border-left:4px solid #38b6ff; border-radius:10px; padding:1.2rem 1.4rem; margin-bottom:0.8rem; box-shadow:0 2px 8px rgba(13,45,94,0.06); transition:box-shadow 0.2s; }
-.ticket-card:hover { box-shadow:0 4px 16px rgba(56,182,255,0.2); }
+.ticket-card { background:#ffffff; border:1px solid #c8e3ff; border-left:4px solid #38b6ff; border-radius:10px; padding:1.2rem 1.4rem; margin-bottom:0.8rem; box-shadow:0 2px 8px rgba(13,45,94,0.06); transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.ticket-card:hover { box-shadow:0 10px 20px rgba(56,182,255,0.15); transform:translateY(-2px); border-color:#38b6ff; }
 .ticket-card.critical { border-left-color:#e53935; }
 .ticket-card.high { border-left-color:#ff7043; }
 .ticket-card.medium { border-left-color:#ffa000; }
@@ -49,6 +49,38 @@ section[data-testid="stSidebar"] .stButton button:hover { background:rgba(56,182
 .ticket-title { font-size:1.05rem; font-weight:600; color:#0d2d5e; margin:0.2rem 0; }
 .ticket-desc { font-size:0.88rem; color:#4a7ab5; margin-top:0.3rem; line-height:1.5; }
 .ticket-meta { font-size:0.8rem; color:#6a9fd8; margin-top:0.6rem; }
+
+/* Hub Portal Cards */
+.portal-card { 
+    background: #ffffff; 
+    border-radius: 20px; 
+    padding: 3rem 2rem; 
+    text-align: center; 
+    box-shadow: 0 10px 30px rgba(13,45,94,0.05); 
+    border: 1px solid #e1e8f0;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+    min-width: 300px;
+    position: relative;
+    overflow: hidden;
+}
+.portal-card:hover { 
+    transform: translateY(-10px); 
+    box-shadow: 0 20px 40px rgba(13,45,94,0.12);
+    border-color: #38b6ff;
+}
+.portal-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 5px;
+    background: linear-gradient(90deg, #0d2d5e, #38b6ff);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.portal-card:hover::before { opacity: 1; }
+.portal-icon { font-size: 4.5rem; margin-bottom: 1.5rem; display: block; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.1)); }
+.portal-title { color: #0d2d5e; font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem; }
+.portal-desc { color: #64748b; font-size: 1rem; line-height: 1.5; }
 
 .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:0.72rem; font-weight:600; letter-spacing:0.03em; text-transform:uppercase; }
 .b-open { background:#dbeeff; color:#0d6efd; border:1px solid #90c6ff; }
@@ -96,6 +128,7 @@ h1,h2,h3,h4 { color:#0d2d5e !important; }
 ::-webkit-scrollbar-track { background:#e8f4ff; }
 ::-webkit-scrollbar-thumb { background:#38b6ff; border-radius:3px; }
 ::-webkit-scrollbar-thumb:hover { background:#0d2d5e; }
+.filter-card { background:#ffffff; padding:1.5rem; border-radius:15px; border:1px solid #e1e8f0; margin-bottom:2rem; box-shadow:0 4px 12px rgba(0,0,0,0.03); }
 .sidebar-user { background:rgba(255,255,255,0.12); border:1px solid rgba(56,182,255,0.3); border-radius:10px; padding:0.9rem 1rem; margin-bottom:1rem; }
 /* hide sidebar collapse button & raw Material-icon text */
 [data-testid="stSidebarCollapseButton"] { display:none !important; }
@@ -1193,26 +1226,39 @@ def page_manage_ares():
     )
 
 def page_all_tickets():
-    st.markdown('<div class="page-header"><div class="page-title">📋 All Tickets</div><div class="page-sub">Complete view of every ticket in the system</div></div>',unsafe_allow_html=True)
-    render_ares_ui()
-    tickets=all_tickets()
-    if not tickets: st.info("No tickets yet."); return
-    c1,c2,c3,c4=st.columns(4)
-    with c1: sf=st.selectbox("Status",["All","OPEN","ASSIGNED","IN_PROGRESS","RESOLVED","CLOSED"])
-    with c2: pf=st.selectbox("Priority",["All","Critical","High","Medium","Low"])
-    with c3:
-        dept_opts = ["All"] + list(ARE_DATA.keys())
-        df2=st.selectbox("Department", dept_opts)
-    with c4: srch=st.text_input("🔍 Search",placeholder="Title or reporter...")
-    filtered=tickets
-    if sf!="All": filtered=[t for t in filtered if t["status"]==sf]
-    if pf!="All": filtered=[t for t in filtered if t["priority"]==pf]
-    if df2!="All": filtered=[t for t in filtered if t["assigned_to"]==df2]
-    if srch:
-        s=srch.lower(); filtered=[t for t in filtered if s in t["title"].lower() or s in t["created_by"].lower()]
-    st.markdown(f"<p style='color:#8b949e;font-size:0.85rem;'>{len(filtered)} ticket(s)</p>",unsafe_allow_html=True)
+    st.markdown('<div class="page-header"><div class="page-title">📋 Ticket Management</div><div class="page-sub">Centralized hub for all service requests and issue tracking</div></div>', unsafe_allow_html=True)
     
-    t1, t2 = st.tabs(["Tickets Raised", "Resolved/Closed"])
+    render_ares_ui()
+    
+    tickets = all_tickets()
+    if not tickets:
+        st.info("No tickets found in the system.")
+        return
+
+    # --- Modern Filters ---
+    with st.container():
+        st.markdown('<div class="filter-card">', unsafe_allow_html=True)
+        st.markdown('<p style="margin-top:0; margin-bottom:1rem; font-weight:600; color:#0d2d5e; font-size:0.9rem;">🎯 Filter Results</p>', unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: sf = st.selectbox("Status", ["All", "OPEN", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "CLOSED"])
+        with c2: pf = st.selectbox("Priority", ["All", "Critical", "High", "Medium", "Low"])
+        with c3:
+            dept_opts = ["All"] + list(ARE_DATA.keys())
+            df2 = st.selectbox("Department", dept_opts)
+        with c4: srch = st.text_input("🔍 Search", placeholder="Title or reporter...")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    filtered = tickets
+    if sf != "All": filtered = [t for t in filtered if t["status"] == sf]
+    if pf != "All": filtered = [t for t in filtered if t["priority"] == pf]
+    if df2 != "All": filtered = [t for t in filtered if t["assigned_to"] == df2]
+    if srch:
+        s = srch.lower()
+        filtered = [t for t in filtered if s in t["title"].lower() or s in t["created_by"].lower()]
+    
+    st.markdown(f"<p style='color:#64748b; font-size:0.9rem; font-weight:500; margin-bottom:1rem;'>Found {len(filtered)} ticket(s)</p>", unsafe_allow_html=True)
+    
+    t1, t2 = st.tabs(["🔥 Active Tickets", "✅ Resolved & Closed"])
     
     active_t = [t for t in filtered if t["status"] not in ["RESOLVED", "CLOSED"]]
     res_t = [t for t in filtered if t["status"] in ["RESOLVED", "CLOSED"]]
@@ -1220,84 +1266,146 @@ def page_all_tickets():
     with t1:
         if active_t:
             users = all_users()
-            user_emails = [u["email"] for u in users]
+            user_emails = sorted([u["email"] for u in users])
             for t in reversed(active_t):
-                with st.expander(f"#{t['ticket_id'][:8].upper()} - {t['title']} ({t['status']})"):
-                    st.markdown(f"**Priority:** {pb(t['priority'])} &nbsp;|&nbsp; **Category:** {t['category']} &nbsp;|&nbsp; **Department:** {t['assigned_to']} &nbsp;|&nbsp; **Reporter:** {t['created_by']}", unsafe_allow_html=True)
-                    st.write(t['description'])
+                # Custom header with badges
+                header_html = f"""
+                <div style="display:flex; align-items:center; width:100%; justify-content:space-between;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-family:monospace; color:#4a7ab5; font-weight:600;">#{t['ticket_id'][:8].upper()}</span>
+                        <span style="font-weight:600; color:#0d2d5e;">{t['title']}</span>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        {pb(t['priority'])}
+                        {sb(t['status'])}
+                    </div>
+                </div>
+                """
+                
+                with st.expander(f"#{t['ticket_id'][:8].upper()} - {t['title']}"):
+                    # Detail view
+                    st.markdown(f"""
+                    <div style="background:#f8fbff; padding:1.2rem; border-radius:10px; border:1px solid #e1e8f0; margin-bottom:1rem;">
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; font-size:0.88rem;">
+                            <div><span style="color:#64748b;">Department:</span> <b style="color:#0d2d5e;">{t['assigned_to']}</b></div>
+                            <div><span style="color:#64748b;">Reporter:</span> <b style="color:#0d2d5e;">{t['created_by']}</b></div>
+                            <div><span style="color:#64748b;">Category:</span> <b style="color:#0d2d5e;">{t['category']}</b></div>
+                            <div><span style="color:#64748b;">Created:</span> <b style="color:#0d2d5e;">{t['created_at']}</b></div>
+                        </div>
+                        <hr style="margin:1rem 0 !important; opacity:0.3;">
+                        <p style="color:#4a7ab5; font-size:0.95rem; line-height:1.6; margin:0;">{t['description']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
-                    st.markdown("---")
-                    current_assignee = t.get("assigned_email", "")
-                    
-                    opts = ["Select a user..."] + user_emails
-                    def_idx = opts.index(current_assignee) if current_assignee in opts else 0
-                    
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
+                    # Actions Row
+                    col_a, col_b = st.columns([2, 1])
+                    with col_a:
+                        current_assignee = t.get("assigned_email", "")
+                        opts = ["Select a user..."] + user_emails
+                        def_idx = opts.index(current_assignee) if current_assignee in opts else 0
                         new_assignee = st.selectbox("🔄 Re-Allot Ticket to:", opts, index=def_idx, key=f"reassign_{t['ticket_id']}")
-                    with col2:
+                    
+                    with col_b:
                         st.markdown("<br>", unsafe_allow_html=True)
-                        if st.button("Re-assign", key=f"btn_reassign_{t['ticket_id']}"):
+                        if st.button("Update Assignee", key=f"btn_reassign_{t['ticket_id']}", use_container_width=True):
                             if new_assignee != "Select a user..." and new_assignee != current_assignee:
-                                with st.spinner("Re-assigning..."):
+                                with st.spinner("Updating..."):
                                     reassign_ticket(t["ticket_id"], new_assignee, st.session_state.email)
-                                st.success("Ticket reassigned successfully!")
+                                st.success("Updated!")
                                 st.rerun()
                             elif new_assignee == current_assignee:
-                                st.warning("Already assigned to this user.")
+                                st.info("No changes made.")
                             else:
-                                st.warning("Please select a valid user.")
+                                st.warning("Select a user.")
+                                
+                    # SLA & History could go here
         else:
-            st.info("No active tickets found in this category.")
+            st.markdown('<div style="text-align:center; padding:3rem; color:#64748b;">No active tickets match your filters.</div>', unsafe_allow_html=True)
             
     with t2:
         if res_t:
-            fbs={f["ticket_id"]:f for f in all_feedback()}
+            fbs = {f["ticket_id"]: f for f in all_feedback()}
             for t in reversed(res_t):
-                fb=fbs.get(t["ticket_id"])
+                fb = fbs.get(t["ticket_id"])
                 if fb:
-                    c_str = f" &middot; {fb['comments']}" if fb.get("comments") else ""
-                    fb_ui = f'<div style="margin-top:6px;color:#f0a500;font-size:0.85rem;">{st_stars(fb["rating"])}{c_str}</div>'
+                    c_str = f" &middot; <i>\"{fb['comments']}\"</i>" if fb.get("comments") else ""
+                    fb_ui = f'<div style="margin-top:8px; background:rgba(240,165,0,0.05); padding:8px 12px; border-radius:8px; color:#f0a500; font-size:0.85rem;">{st_stars(fb["rating"])}{c_str}</div>'
                 else:
-                    fb_ui = '<div style="margin-top:6px;color:#8b949e;font-size:0.82rem;">⏳ Awaiting feedback</div>'
+                    fb_ui = '<div style="margin-top:8px; color:#64748b; font-size:0.82rem; font-style:italic;">⏳ Feedback pending from reporter</div>'
+                
                 rt = get_resolution_time_str(t)
-                rt_badge = f" &nbsp;&nbsp; ⏱️ Time: {rt}" if rt else ""
-                st.markdown(f"""<div class="ticket-card low"><div class="ticket-id">#{t['ticket_id'][:8].upper()}</div>
-<div class="ticket-title">{t['title']}</div>
-<div class="ticket-meta">{sb(t['status'])} &nbsp; {pb(t['priority'])} &nbsp; 🏢 {t['assigned_to']} &nbsp; 👤 {t['created_by']} &nbsp;&nbsp; 📅 {t['updated_at']}{rt_badge}</div>
-{f'<div style="margin-top:8px;color:#3fb950;font-size:0.85rem;">✅ {t["resolution_notes"]}</div>' if t.get("resolution_notes") else ""}
-{fb_ui}
-</div>""",unsafe_allow_html=True)
+                rt_badge = f' <span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:12px; font-size:0.7rem; font-weight:600;">⏱️ {rt}</span>' if rt else ""
+                
+                st.markdown(f"""
+                <div class="ticket-card {PB.get(t['priority'], 'low')}">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <div class="ticket-id">#{t['ticket_id'][:8].upper()}</div>
+                            <div class="ticket-title">{t['title']}</div>
+                        </div>
+                        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
+                            {sb(t['status'])}
+                            {pb(t['priority'])}
+                        </div>
+                    </div>
+                    <div class="ticket-meta">
+                        🏢 {t['assigned_to']} &nbsp; 👤 {t['created_by']} &nbsp; 📅 {t['updated_at']} {rt_badge}
+                    </div>
+                    {f'<div style="margin-top:12px; background:#f0fff4; border:1px solid #c6f6d5; padding:10px; border-radius:8px; color:#166534; font-size:0.88rem;"><b>✅ Resolution:</b> {t["resolution_notes"]}</div>' if t.get("resolution_notes") else ""}
+                    {fb_ui}
+                </div>
+                """, unsafe_allow_html=True)
         else:
-            st.info("No resolved or closed tickets found.")
+            st.markdown('<div style="text-align:center; padding:3rem; color:#64748b;">No resolved tickets match your filters.</div>', unsafe_allow_html=True)
 
 def page_hub():
-    st.markdown("<h2 style='text-align:center; color:#0d2d5e;'>Select Workspace</h2>", unsafe_allow_html=True)
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align:center; padding: 2rem 0;">
+        <h1 style="font-size:2.5rem; color:#0d2d5e; margin-bottom:0.5rem;">Welcome to MPDR Hub</h1>
+        <p style="color:#64748b; font-size:1.1rem;">Select a workspace to continue your work</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
     col1, col2, col3, col4 = st.columns([1, 4, 4, 1])
+    
     with col2:
-        st.markdown("""<div style="background:white;border-radius:12px;padding:3rem;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.05);cursor:pointer;border:2px solid transparent;transition:all 0.3s ease;" onmouseover="this.style.borderColor='#38b6ff';this.style.transform='translateY(-5px)';" onmouseout="this.style.borderColor='transparent';this.style.transform='translateY(0)';">
-        <h1 style="font-size:4rem;margin:0;">🛠️</h1>
-        <h3 style="color:#0d2d5e;margin-top:1rem;">IMS Portal</h3>
-        <p style="color:#64748b;">Information Management System</p>
-        </div>""", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Enter IMS →", key="btn_enter_ims", use_container_width=True, type="primary"):
+        st.markdown("""
+        <div class="portal-card">
+            <span class="portal-icon">🔬</span>
+            <div class="portal-title">IMS Portal</div>
+            <p class="portal-desc">Information Management System<br>Track tickets, issues, and lab requests</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<div style='margin-top:-1.5rem;'>", unsafe_allow_html=True)
+        if st.button("Enter IMS Workspace →", key="btn_enter_ims", use_container_width=True, type="primary"):
             st.session_state.app_mode = "ims"
             st.session_state.page = "home"
             st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
             
     with col3:
-        st.markdown("""<div style="background:white;border-radius:12px;padding:3rem;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.05);cursor:pointer;border:2px solid transparent;transition:all 0.3s ease;" onmouseover="this.style.borderColor='#38b6ff';this.style.transform='translateY(-5px)';" onmouseout="this.style.borderColor='transparent';this.style.transform='translateY(0)';">
-        <h1 style="font-size:4rem;margin:0;">👥</h1>
-        <h3 style="color:#0d2d5e;margin-top:1rem;">HRMS Portal</h3>
-        <p style="color:#64748b;">Human Resources Management</p>
-        </div>""", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Enter HRMS →", key="btn_enter_hrms", use_container_width=True, type="primary"):
+        st.markdown("""
+        <div class="portal-card">
+            <span class="portal-icon">👔</span>
+            <div class="portal-title">HRMS Portal</div>
+            <p class="portal-desc">Human Resources Management<br>Manage profiles, KRAs, and assessments</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<div style='margin-top:-1.5rem;'>", unsafe_allow_html=True)
+        if st.button("Enter HRMS Workspace →", key="btn_enter_hrms", use_container_width=True, type="primary"):
             st.session_state.app_mode = "hrms"
             st.session_state.page = "hrms_profile"
             st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align:center; color:#94a3b8; font-size:0.85rem;">
+        Morepen Proprietary Drug Research Pvt. Ltd. &copy; 2026<br>
+        Proprietary & Confidential
+    </div>
+    """, unsafe_allow_html=True)
 
 def main():
     if not st.session_state.logged_in:
