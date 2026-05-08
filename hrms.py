@@ -5,8 +5,37 @@ import pandas as pd
 # HRMS Database schema operations
 def all_hrms_profiles(get_or_create_sheet, safe_get_all_records):
     try:
-        ws = get_or_create_sheet("hrms_profiles", ["email", "full_name", "designation", "department", "phone", "emergency_contact", "present_address", "permanent_address", "updated_at"])
-        return safe_get_all_records(ws)
+        # Fetch HRMS profiles
+        p_ws = get_or_create_sheet("hrms_profiles", ["email", "full_name", "designation", "department", "phone", "emergency_contact", "present_address", "permanent_address", "updated_at"])
+        profiles = safe_get_all_records(p_ws)
+        
+        # Fetch User registration data for fallbacks
+        u_ws = get_or_create_sheet("users", ["email", "password", "role", "department", "created_at"])
+        users = safe_get_all_records(u_ws)
+        
+        # Create a merged map
+        merged = {u["email"]: {
+            "email": u["email"],
+            "full_name": u["email"].split('@')[0].replace('.', ' ').title(),
+            "department": u.get("department", "Unknown Dept"),
+            "designation": "Staff",
+            "phone": "",
+            "emergency_contact": "",
+            "present_address": "",
+            "permanent_address": "",
+            "updated_at": u.get("created_at", "")
+        } for u in users}
+        
+        # Overlay with actual profile data
+        for p in profiles:
+            email = p.get("email")
+            if email:
+                if email not in merged:
+                    merged[email] = p
+                else:
+                    merged[email].update(p)
+                    
+        return list(merged.values())
     except:
         return []
 
