@@ -256,14 +256,6 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
     pending = [k for k in kras if str(k.get("status", "")).strip().upper() == "SUBMITTED"]
     assessed = [k for k in kras if str(k.get("status", "")).strip().upper() == "ASSESSED"]
     
-    # Optional debug view for troubleshooting
-    with st.expander("🛠️ Debug: All Record Statuses (Admin Only)"):
-        all_stats = [str(k.get("status", "")) for k in kras]
-        st.write("Unique statuses in DB:", set(all_stats))
-        st.write(f"Total KRAs: {len(kras)}, Pending: {len(pending)}, Assessed: {len(assessed)}")
-        if st.checkbox("Show Raw KRA Data"):
-            st.write(kras)
-
     tab1, tab2 = st.tabs([f"Pending Assessment ({len(pending)})", f"Assessed ({len(assessed)})"])
     
     with tab1:
