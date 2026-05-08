@@ -1,4 +1,5 @@
 import uuid
+import json
 import pandas as pd
 
 # HRMS Database schema operations
@@ -28,24 +29,26 @@ def update_hrms_profile(email, full_name, designation, department, phone, emerge
 
 def all_hrms_kras(get_or_create_sheet, safe_get_all_records):
     try:
-        ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "status", "submitted_at", "assessed_at", "assessment_notes", "rating"])
+        ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating"])
         return safe_get_all_records(ws)
     except:
         return []
 
-def submit_kra(email, year, quarter, objectives, achievements, challenges, get_or_create_sheet, safe_get_all_records, now_ist):
-    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "status", "submitted_at", "assessed_at", "assessment_notes", "rating"])
+def submit_kra(email, year, quarter, objectives, achievements, challenges, tech_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
+    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating"])
     kra_id = str(uuid.uuid4())[:8].upper()
     now = now_ist().strftime("%Y-%m-%d %H:%M:%S")
-    ws.append_row([kra_id, email, year, quarter, objectives, achievements, challenges, "SUBMITTED", now, "", "", ""])
+    tech_json = json.dumps(tech_assessment)
+    ws.append_row([kra_id, email, year, quarter, objectives, achievements, challenges, tech_json, "SUBMITTED", now, "", "", ""])
 
-def assess_kra(kra_id, notes, rating, get_or_create_sheet, safe_get_all_records, now_ist):
-    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "status", "submitted_at", "assessed_at", "assessment_notes", "rating"])
+def assess_kra(kra_id, notes, rating, tech_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
+    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating"])
     recs = safe_get_all_records(ws)
     now = now_ist().strftime("%Y-%m-%d %H:%M:%S")
+    tech_json = json.dumps(tech_assessment)
     for i, r in enumerate(recs, start=2):
         if str(r.get("kra_id", "")) == kra_id:
-            ws.update(f"H{i}:L{i}", [["ASSESSED", r["submitted_at"], now, notes, rating]])
+            ws.update(f"H{i}:M{i}", [[tech_json, "ASSESSED", r["submitted_at"], now, notes, rating]])
             return
 
 # UI Rendering functions
@@ -117,13 +120,23 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
             achievements = st.text_area("Achievements & Deliverables", height=150)
             challenges = st.text_area("Challenges & Support Required", height=100)
             
+            st.markdown("---")
+            st.markdown("#### Technical Assessment")
+            st.info("💡 You can add/edit rows in the table below. Fill your KPI, Target, Weightage, and Self-Assessment.")
+            
+            df_init = pd.DataFrame([
+                {"KPI": "", "SMART Target": "", "Weightage (%)": 0, "Self-Assessment": "", "Manager Assess": ""}
+            ])
+            edited_df = st.data_editor(df_init, num_rows="dynamic", use_container_width=True, key="tech_eval_editor")
+            
             submitted = st.form_submit_button("Submit KRA for Assessment", type="primary")
             if submitted:
                 if not objectives or not achievements:
                     st.error("Objectives and Achievements are required.")
                 else:
                     with st.spinner("Submitting KRA..."):
-                        submit_kra(email, year, quarter, objectives, achievements, challenges, get_or_create_sheet, safe_get_all_records, now_ist)
+                        tech_data = edited_df.to_dict('records')
+                        submit_kra(email, year, quarter, objectives, achievements, challenges, tech_data, get_or_create_sheet, safe_get_all_records, now_ist)
                     st.success("KRA submitted successfully!")
                     st.rerun()
                     
@@ -151,6 +164,15 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                         <strong style="color:#3fb950;">Rating: {k['rating']} / 5</strong>
                     </div>
                     """, unsafe_allow_html=True)
+                    
+                    if k.get("tech_assessment"):
+                        try:
+                            tech_list = json.loads(k["tech_assessment"])
+                            if tech_list:
+                                st.markdown("<strong>Technical Assessment Details:</strong>", unsafe_allow_html=True)
+                                st.dataframe(pd.DataFrame(tech_list), use_container_width=True, hide_index=True)
+                        except:
+                            pass
                     
                 st.markdown("</div>", unsafe_allow_html=True)
 
@@ -210,13 +232,35 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                     st.markdown(f"**Achievements:** {k['achievements']}")
                     st.markdown(f"**Challenges:** {k['challenges']}")
                     
+                    
                     with st.form(f"assess_form_{k['kra_id']}"):
-                        notes = st.text_area("Assessment Notes / Feedback")
-                        rating = st.slider("Rating (1-5)", 1, 5, 3)
+                        st.markdown("#### Technical Assessment")
+                        try:
+                            tech_list = json.loads(k.get("tech_assessment", "[]"))
+                            if not tech_list:
+                                tech_list = [{"KPI": "", "SMART Target": "", "Weightage (%)": 0, "Self-Assessment": "", "Manager Assess": ""}]
+                        except:
+                            tech_list = [{"KPI": "", "SMART Target": "", "Weightage (%)": 0, "Self-Assessment": "", "Manager Assess": ""}]
+                        
+                        df_tech = pd.DataFrame(tech_list)
+                        edited_tech_df = st.data_editor(
+                            df_tech, 
+                            num_rows="dynamic", 
+                            use_container_width=True, 
+                            key=f"tech_edit_{k['kra_id']}",
+                            column_config={
+                                "Manager Assess": st.column_config.TextColumn("Manager Assess", help="Provide your evaluation")
+                            }
+                        )
+                        
+                        st.markdown("---")
+                        notes = st.text_area("General Assessment Notes / Feedback")
+                        rating = st.slider("Overall Rating (1-5)", 1, 5, 3)
                         
                         if st.form_submit_button("Submit Assessment", type="primary"):
                             with st.spinner("Saving assessment..."):
-                                assess_kra(k['kra_id'], notes, rating, get_or_create_sheet, safe_get_all_records, now_ist)
+                                tech_data = edited_tech_df.to_dict('records')
+                                assess_kra(k['kra_id'], notes, rating, tech_data, get_or_create_sheet, safe_get_all_records, now_ist)
                             st.success("Assessment saved!")
                             st.rerun()
                             
@@ -231,6 +275,16 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                         <span style="font-weight:600;color:#0d2d5e;font-size:1.1rem;">{k['email']} - {k['year']} {k['quarter']}</span>
                         <span style="color:#3fb950;font-weight:bold;">Rating: {k['rating']}/5</span>
                     </div>
-                    <div style="margin-bottom:0.5rem;"><strong>Assessment Notes:</strong><br>{k['assessment_notes']}</div>
-                </div>
+                    <div style="margin-bottom:0.8rem;"><strong>Assessment Notes:</strong><br>{k['assessment_notes']}</div>
                 """, unsafe_allow_html=True)
+                
+                if k.get("tech_assessment"):
+                    try:
+                        tech_list = json.loads(k["tech_assessment"])
+                        if tech_list:
+                            st.markdown("<strong>Technical Assessment:</strong>", unsafe_allow_html=True)
+                            st.dataframe(pd.DataFrame(tech_list), use_container_width=True, hide_index=True)
+                    except:
+                        pass
+                
+                st.markdown("</div>", unsafe_allow_html=True)
