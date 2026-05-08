@@ -210,22 +210,36 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
     </div>
     """, unsafe_allow_html=True)
     
+    if st.button("🔄 Refresh Data"):
+        st.cache_resource.clear()
+        st.rerun()
+
     kras = all_hrms_kras(get_or_create_sheet, safe_get_all_records)
+    
     if not kras:
-        st.info("No KRAs available.")
+        st.info("No KRAs found in the database.")
         return
         
     profiles = all_hrms_profiles(get_or_create_sheet, safe_get_all_records)
     prof_map = {p["email"]: p for p in profiles}
 
-    pending = [k for k in kras if str(k.get("status", "")).strip() == "SUBMITTED"]
-    assessed = [k for k in kras if str(k.get("status", "")).strip() == "ASSESSED"]
+    # Robust filtering: strip spaces and convert to upper case
+    pending = [k for k in kras if str(k.get("status", "")).strip().upper() == "SUBMITTED"]
+    assessed = [k for k in kras if str(k.get("status", "")).strip().upper() == "ASSESSED"]
     
+    # Optional debug view for troubleshooting
+    with st.expander("🛠️ Debug: All Record Statuses (Admin Only)"):
+        all_stats = [str(k.get("status", "")) for k in kras]
+        st.write("Unique statuses in DB:", set(all_stats))
+        st.write(f"Total KRAs: {len(kras)}, Pending: {len(pending)}, Assessed: {len(assessed)}")
+        if st.checkbox("Show Raw KRA Data"):
+            st.write(kras)
+
     tab1, tab2 = st.tabs([f"Pending Assessment ({len(pending)})", f"Assessed ({len(assessed)})"])
     
     with tab1:
         if not pending:
-            st.success("All KRAs have been assessed!")
+            st.info("No KRAs are currently pending assessment.")
         else:
             for k in pending:
                 p = prof_map.get(k["email"], {})
