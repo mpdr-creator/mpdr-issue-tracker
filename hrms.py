@@ -116,9 +116,6 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
             with col2:
                 quarter = st.selectbox("Quarter / Cycle", ["Q1", "Q2", "Q3", "Q4", "Annual"])
                 
-            objectives = st.text_area("Key Objectives (Set at the beginning)", height=150)
-            achievements = st.text_area("Achievements & Deliverables", height=150)
-            challenges = st.text_area("Challenges & Support Required", height=100)
             
             st.markdown("---")
             st.markdown("#### Technical Assessment")
@@ -131,13 +128,11 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
             
             submitted = st.form_submit_button("Submit KRA for Assessment", type="primary")
             if submitted:
-                if not objectives or not achievements:
-                    st.error("Objectives and Achievements are required.")
-                else:
-                    with st.spinner("Submitting KRA..."):
-                        tech_data = edited_df.to_dict('records')
-                        submit_kra(email, year, quarter, objectives, achievements, challenges, tech_data, get_or_create_sheet, safe_get_all_records, now_ist)
-                    st.success("KRA submitted successfully!")
+                with st.spinner("Submitting KRA..."):
+                    tech_data = edited_df.to_dict('records')
+                    # Pass empty strings for removed fields
+                    submit_kra(email, year, quarter, "", "", "", tech_data, get_or_create_sheet, safe_get_all_records, now_ist)
+                st.success("KRA submitted successfully!")
                     st.rerun()
                     
     with tab2:
@@ -152,8 +147,7 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                         <span style="font-weight:600;color:#0d2d5e;font-size:1.1rem;">KRA: {k['year']} - {k['quarter']}</span>
                         <span style="background:{status_color};color:white;padding:2px 8px;border-radius:12px;font-size:0.8rem;font-weight:bold;">{k['status']}</span>
                     </div>
-                    <div style="margin-bottom:0.5rem;"><strong>Objectives:</strong><br>{k['objectives']}</div>
-                    <div style="margin-bottom:0.5rem;"><strong>Achievements:</strong><br>{k['achievements']}</div>
+                    <div style="margin-bottom:0.5rem;"><strong>Technical Assessment:</strong></div>
                 """, unsafe_allow_html=True)
                 
                 if k["status"] == "ASSESSED":
@@ -169,7 +163,6 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                         try:
                             tech_list = json.loads(k["tech_assessment"])
                             if tech_list:
-                                st.markdown("<strong>Technical Assessment Details:</strong>", unsafe_allow_html=True)
                                 st.dataframe(pd.DataFrame(tech_list), use_container_width=True, hide_index=True)
                         except:
                             pass
@@ -228,9 +221,6 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
         else:
             for k in pending:
                 with st.expander(f"KRA: {k['full_name'] if 'full_name' in k else k['email']} | {k['year']} {k['quarter']}"):
-                    st.markdown(f"**Objectives:** {k['objectives']}")
-                    st.markdown(f"**Achievements:** {k['achievements']}")
-                    st.markdown(f"**Challenges:** {k['challenges']}")
                     
                     
                     with st.form(f"assess_form_{k['kra_id']}"):
