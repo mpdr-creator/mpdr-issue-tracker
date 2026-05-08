@@ -816,7 +816,8 @@ def render_sidebar():
                 <p style="color:#64748b;font-size:0.8rem;margin:0;">{st.session_state.email}</p>
             </div>""",unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("👤 My Profile & Info", use_container_width=True): st.session_state.page="hrms_profile"
+            if st.session_state.email != "hr@morepenpdr.com":
+                if st.button("👤 My Profile & Info", use_container_width=True): st.session_state.page="hrms_profile"
             if st.button("📝 My KRA", use_container_width=True): st.session_state.page="hrms_kra"
             if st.session_state.role == "management" or st.session_state.email == "hr@morepenpdr.com":
                 st.markdown("<hr style='border-color:rgba(56,182,255,0.3);margin:1rem 0;'>",unsafe_allow_html=True)
