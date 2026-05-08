@@ -210,6 +210,9 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
         st.info("No KRAs available.")
         return
         
+    profiles = all_hrms_profiles(get_or_create_sheet, safe_get_all_records)
+    prof_map = {p["email"]: p for p in profiles}
+
     pending = [k for k in kras if k["status"] == "SUBMITTED"]
     assessed = [k for k in kras if k["status"] == "ASSESSED"]
     
@@ -220,9 +223,11 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
             st.success("All KRAs have been assessed!")
         else:
             for k in pending:
-                with st.expander(f"KRA: {k['full_name'] if 'full_name' in k else k['email']} | {k['year']} {k['quarter']}"):
-                    
-                    
+                p = prof_map.get(k["email"], {})
+                name = p.get("full_name", k["email"])
+                dept = p.get("department", "Unknown Dept")
+                
+                with st.expander(f"KRA: {name} ({dept}) | {k['year']} {k['quarter']}"):
                     with st.form(f"assess_form_{k['kra_id']}"):
                         st.markdown("#### Technical Assessment")
                         try:
@@ -235,10 +240,14 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                         df_tech = pd.DataFrame(tech_list)
                         edited_tech_df = st.data_editor(
                             df_tech, 
-                            num_rows="dynamic", 
+                            num_rows="fixed", 
                             use_container_width=True, 
                             key=f"tech_edit_{k['kra_id']}",
                             column_config={
+                                "KPI": st.column_config.TextColumn(disabled=True),
+                                "SMART Target": st.column_config.TextColumn(disabled=True),
+                                "Weightage (%)": st.column_config.NumberColumn(disabled=True),
+                                "Self-Assessment": st.column_config.TextColumn(disabled=True),
                                 "Manager Assess": st.column_config.TextColumn("Manager Assess", help="Provide your evaluation")
                             }
                         )
@@ -259,10 +268,14 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
             st.info("No assessed KRAs.")
         else:
             for k in reversed(assessed):
+                p = prof_map.get(k["email"], {})
+                name = p.get("full_name", k["email"])
+                dept = p.get("department", "Unknown Dept")
+                
                 st.markdown(f"""
                 <div style="background:white;padding:1.5rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.05);margin-bottom:1rem;border-left:4px solid #3fb950;">
                     <div style="display:flex;justify-content:space-between;margin-bottom:1rem;">
-                        <span style="font-weight:600;color:#0d2d5e;font-size:1.1rem;">{k['email']} - {k['year']} {k['quarter']}</span>
+                        <span style="font-weight:600;color:#0d2d5e;font-size:1.1rem;">{name} ({dept}) - {k['year']} {k['quarter']}</span>
                         <span style="color:#3fb950;font-weight:bold;">Rating: {k['rating']}/5</span>
                     </div>
                     <div style="margin-bottom:0.8rem;"><strong>Assessment Notes:</strong><br>{k['assessment_notes']}</div>
