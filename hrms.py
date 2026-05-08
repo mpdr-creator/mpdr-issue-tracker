@@ -140,33 +140,38 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
             st.info("No KRAs submitted yet.")
         else:
             for k in reversed(kras):
-                status_color = "#f0a500" if k["status"] == "SUBMITTED" else "#3fb950"
+                status = str(k.get("status", "")).strip()
+                status_color = "#f0a500" if status == "SUBMITTED" else "#3fb950"
+                
                 st.markdown(f"""
                 <div style="background:white;padding:1.5rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.05);margin-bottom:1rem;border-left:4px solid {status_color};">
                     <div style="display:flex;justify-content:space-between;margin-bottom:1rem;">
                         <span style="font-weight:600;color:#0d2d5e;font-size:1.1rem;">KRA: {k['year']} - {k['quarter']}</span>
-                        <span style="background:{status_color};color:white;padding:2px 8px;border-radius:12px;font-size:0.8rem;font-weight:bold;">{k['status']}</span>
+                        <span style="background:{status_color};color:white;padding:4px 12px;border-radius:20px;font-size:0.8rem;font-weight:bold;">{status}</span>
                     </div>
-                    <div style="margin-bottom:0.5rem;"><strong>Technical Assessment:</strong></div>
                 """, unsafe_allow_html=True)
                 
-                if k["status"] == "ASSESSED":
+                # Always show tech assessment table if available
+                if k.get("tech_assessment"):
+                    try:
+                        tech_list = json.loads(k["tech_assessment"])
+                        if tech_list:
+                            st.markdown("<strong>Technical Assessment:</strong>", unsafe_allow_html=True)
+                            st.dataframe(pd.DataFrame(tech_list), use_container_width=True, hide_index=True)
+                    except:
+                        pass
+                
+                if status == "ASSESSED":
                     st.markdown(f"""
-                    <div style="margin-top:1rem;padding:1rem;background:#f8f9fa;border-radius:6px;border:1px solid #e1e4e8;">
-                        <strong style="color:#0d2d5e;">Manager Assessment:</strong><br>
-                        {k['assessment_notes']}<br><br>
-                        <strong style="color:#3fb950;">Rating: {k['rating']} / 5</strong>
+                    <div style="margin-top:1.5rem;padding:1.2rem;background:#f0f9ff;border-radius:8px;border:1px solid #bae6fd;">
+                        <div style="color:#0369a1;font-weight:600;margin-bottom:0.5rem;display:flex;align-items:center;gap:8px;">
+                            <span>🎯 Manager Assessment</span>
+                            <span style="background:#0369a1;color:white;padding:2px 8px;border-radius:12px;font-size:0.75rem;">Rating: {k['rating']}/5</span>
+                        </div>
+                        <div style="color:#1e293b;font-size:0.95rem;line-height:1.5;">{k['assessment_notes']}</div>
                     </div>
                     """, unsafe_allow_html=True)
-                    
-                    if k.get("tech_assessment"):
-                        try:
-                            tech_list = json.loads(k["tech_assessment"])
-                            if tech_list:
-                                st.dataframe(pd.DataFrame(tech_list), use_container_width=True, hide_index=True)
-                        except:
-                            pass
-                    
+                
                 st.markdown("</div>", unsafe_allow_html=True)
 
 def page_hrms_db(st, session_state, get_or_create_sheet, safe_get_all_records, now_ist):
@@ -213,8 +218,8 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
     profiles = all_hrms_profiles(get_or_create_sheet, safe_get_all_records)
     prof_map = {p["email"]: p for p in profiles}
 
-    pending = [k for k in kras if k["status"] == "SUBMITTED"]
-    assessed = [k for k in kras if k["status"] == "ASSESSED"]
+    pending = [k for k in kras if str(k.get("status", "")).strip() == "SUBMITTED"]
+    assessed = [k for k in kras if str(k.get("status", "")).strip() == "ASSESSED"]
     
     tab1, tab2 = st.tabs([f"Pending Assessment ({len(pending)})", f"Assessed ({len(assessed)})"])
     
@@ -232,25 +237,27 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                         st.markdown("#### Technical Assessment")
                         try:
                             tech_list = json.loads(k.get("tech_assessment", "[]"))
-                            if not tech_list:
-                                tech_list = [{"KPI": "", "SMART Target": "", "Weightage (%)": 0, "Self-Assessment": "", "Manager Assess": ""}]
                         except:
-                            tech_list = [{"KPI": "", "SMART Target": "", "Weightage (%)": 0, "Self-Assessment": "", "Manager Assess": ""}]
+                            tech_list = []
                         
-                        df_tech = pd.DataFrame(tech_list)
-                        edited_tech_df = st.data_editor(
-                            df_tech, 
-                            num_rows="fixed", 
-                            use_container_width=True, 
-                            key=f"tech_edit_{k['kra_id']}",
-                            column_config={
-                                "KPI": st.column_config.TextColumn(disabled=True),
-                                "SMART Target": st.column_config.TextColumn(disabled=True),
-                                "Weightage (%)": st.column_config.NumberColumn(disabled=True),
-                                "Self-Assessment": st.column_config.TextColumn(disabled=True),
-                                "Manager Assess": st.column_config.TextColumn("Manager Assess", help="Provide your evaluation")
-                            }
-                        )
+                        if tech_list:
+                            df_tech = pd.DataFrame(tech_list)
+                            edited_tech_df = st.data_editor(
+                                df_tech, 
+                                num_rows="fixed", 
+                                use_container_width=True, 
+                                key=f"tech_edit_{k['kra_id']}",
+                                column_config={
+                                    "KPI": st.column_config.TextColumn(disabled=True),
+                                    "SMART Target": st.column_config.TextColumn(disabled=True),
+                                    "Weightage (%)": st.column_config.NumberColumn(disabled=True),
+                                    "Self-Assessment": st.column_config.TextColumn(disabled=True),
+                                    "Manager Assess": st.column_config.TextColumn("Manager Assess", help="Provide your evaluation")
+                                }
+                            )
+                        else:
+                            st.warning("No technical assessment data found.")
+                            edited_tech_df = pd.DataFrame()
                         
                         st.markdown("---")
                         notes = st.text_area("General Assessment Notes / Feedback")
@@ -258,7 +265,7 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                         
                         if st.form_submit_button("Submit Assessment", type="primary"):
                             with st.spinner("Saving assessment..."):
-                                tech_data = edited_tech_df.to_dict('records')
+                                tech_data = edited_tech_df.to_dict('records') if not edited_tech_df.empty else []
                                 assess_kra(k['kra_id'], notes, rating, tech_data, get_or_create_sheet, safe_get_all_records, now_ist)
                             st.success("Assessment saved!")
                             st.rerun()
