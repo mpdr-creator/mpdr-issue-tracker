@@ -53,6 +53,10 @@ def page_hrms_profile(st, session_state, get_or_create_sheet, safe_get_all_recor
     st.markdown("<h2 style='color:#0d2d5e;'>👤 My Profile & Info</h2>", unsafe_allow_html=True)
     
     email = session_state.email
+    if email == "hr@morepenpdr.com":
+        st.info("ℹ️ HR profiles are not required to fill personal information.")
+        return
+
     profile = get_hrms_profile(email, get_or_create_sheet, safe_get_all_records)
     
     with st.form("profile_form"):
@@ -150,8 +154,11 @@ def page_hrms_db(st, session_state, get_or_create_sheet, safe_get_all_records, n
         
     df = pd.DataFrame(profiles)
     
-    # Hide some columns for the main view
-    display_df = df[['full_name', 'email', 'department', 'designation', 'phone', 'updated_at']].copy()
+    # Show more columns for HR/Management
+    if session_state.role == "management" or session_state.email == "hr@morepenpdr.com":
+        display_df = df[['full_name', 'email', 'department', 'designation', 'phone', 'emergency_contact', 'present_address', 'permanent_address', 'updated_at']].copy()
+    else:
+        display_df = df[['full_name', 'email', 'department', 'designation', 'phone', 'updated_at']].copy()
     
     search = st.text_input("🔍 Search Employees", placeholder="Name, Email, or Department...")
     if search:
