@@ -748,8 +748,11 @@ def login_page():
                 rp2=st.text_input("Confirm Password",type="password",key="re_p2")
                 rr=st.selectbox("Role",["scientist","admin","management"],key="re_r")
                 rd=""
+                # Standardized departments for all roles as requested
+                STANDARD_DEPTS = ["Admin", "CADD", "MedChem", "API", "AR&D", "CDMO", "SSD"]
                 if rr=="admin": rd=st.selectbox("Department", list(ARE_DATA.keys()), key="re_d")
-                elif rr=="scientist": rd=st.selectbox("Department", ["CADD", "API", "MedChem", "AR&D", "QA/QC", "SSD", "CDMO"], key="re_d_sci")
+                elif rr=="scientist": rd=st.selectbox("Department", STANDARD_DEPTS, key="re_d_sci")
+                elif rr=="management": rd=st.selectbox("Department", STANDARD_DEPTS, key="re_d_mgmt")
                 st.markdown("<br>",unsafe_allow_html=True)
                 if st.button("Send OTP →",use_container_width=True,key="btn_re_otp"):
                     if not re.endswith("@morepenpdr.com"): st.error("⛔ Only @morepenpdr.com emails allowed.")
