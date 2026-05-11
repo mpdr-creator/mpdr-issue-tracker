@@ -6,7 +6,7 @@ import pandas as pd
 def all_hrms_profiles(get_or_create_sheet, safe_get_all_records):
     try:
         # Fetch HRMS profiles
-        p_ws = get_or_create_sheet("hrms_profiles", ["email", "full_name", "designation", "department", "phone", "emergency_contact", "present_address", "permanent_address", "updated_at"])
+        p_ws = get_or_create_sheet("hrms_profiles", ["email", "full_name", "designation", "department", "phone", "emergency_contact", "present_address", "permanent_address", "transport_required", "health_issues", "updated_at"])
         profiles = safe_get_all_records(p_ws)
         
         # Fetch User registration data for fallbacks
@@ -23,6 +23,8 @@ def all_hrms_profiles(get_or_create_sheet, safe_get_all_records):
             "emergency_contact": "",
             "present_address": "",
             "permanent_address": "",
+            "transport_required": "No",
+            "health_issues": "",
             "updated_at": u.get("created_at", "")
         } for u in users}
         
@@ -46,15 +48,15 @@ def get_hrms_profile(email, get_or_create_sheet, safe_get_all_records):
             return p
     return None
 
-def update_hrms_profile(email, full_name, designation, department, phone, emergency_contact, present_address, permanent_address, get_or_create_sheet, safe_get_all_records, now_ist):
-    ws = get_or_create_sheet("hrms_profiles", ["email", "full_name", "designation", "department", "phone", "emergency_contact", "present_address", "permanent_address", "updated_at"])
+def update_hrms_profile(email, full_name, designation, department, phone, emergency_contact, present_address, permanent_address, transport_required, health_issues, get_or_create_sheet, safe_get_all_records, now_ist):
+    ws = get_or_create_sheet("hrms_profiles", ["email", "full_name", "designation", "department", "phone", "emergency_contact", "present_address", "permanent_address", "transport_required", "health_issues", "updated_at"])
     recs = safe_get_all_records(ws)
     now = now_ist().strftime("%Y-%m-%d %H:%M:%S")
     for i, r in enumerate(recs, start=2):
         if str(r.get("email", "")) == email:
-            ws.update(f"B{i}:I{i}", [[full_name, designation, department, phone, emergency_contact, present_address, permanent_address, now]])
+            ws.update(f"B{i}:K{i}", [[full_name, designation, department, phone, emergency_contact, present_address, permanent_address, transport_required, health_issues, now]])
             return
-    ws.append_row([email, full_name, designation, department, phone, emergency_contact, present_address, permanent_address, now])
+    ws.append_row([email, full_name, designation, department, phone, emergency_contact, present_address, permanent_address, transport_required, health_issues, now])
 
 def all_hrms_kras(get_or_create_sheet, safe_get_all_records):
     try:
@@ -102,7 +104,16 @@ def page_hrms_profile(st, session_state, get_or_create_sheet, safe_get_all_recor
         
         with col1:
             full_name = st.text_input("Full Name", value=profile.get("full_name", "") if profile else "")
-            department = st.text_input("Department", value=profile.get("department", session_state.get("dept", "")) if profile else session_state.get("dept", ""), disabled=True)
+            
+            # Department Dropdown as requested
+            DEPARTMENTS = ["Admin", "CADD", "MedChem", "API", "AR&D", "CDMO", "SSD"]
+            current_dept = profile.get("department", session_state.get("dept", "")) if profile else session_state.get("dept", "")
+            try:
+                dept_index = DEPARTMENTS.index(current_dept)
+            except:
+                dept_index = 0
+            department = st.selectbox("Department", DEPARTMENTS, index=dept_index)
+            
             phone = st.text_input("Phone Number", value=profile.get("phone", "") if profile else "")
             
         with col2:
@@ -114,13 +125,20 @@ def page_hrms_profile(st, session_state, get_or_create_sheet, safe_get_all_recor
         present_address = st.text_area("Present Address", value=profile.get("present_address", "") if profile else "")
         permanent_address = st.text_area("Permanent Address", value=profile.get("permanent_address", "") if profile else "")
         
+        st.markdown("### Additional Information")
+        col_extra1, col_extra2 = st.columns(2)
+        with col_extra1:
+            transport_required = st.selectbox("Office Transport Facility Required?", ["No", "Yes"], index=0 if (not profile or profile.get("transport_required", "No")=="No") else 1)
+        with col_extra2:
+            health_issues = st.text_area("Any Health Issues / Medical Conditions", value=profile.get("health_issues", "") if profile else "", height=100)
+        
         submitted = st.form_submit_button("Save Profile", type="primary")
         if submitted:
             if not full_name or not phone:
                 st.error("Full Name and Phone Number are required.")
             else:
                 with st.spinner("Saving profile..."):
-                    update_hrms_profile(email, full_name, designation, department, phone, emergency_contact, present_address, permanent_address, get_or_create_sheet, safe_get_all_records, now_ist)
+                    update_hrms_profile(email, full_name, designation, department, phone, emergency_contact, present_address, permanent_address, transport_required, health_issues, get_or_create_sheet, safe_get_all_records, now_ist)
                 st.success("Profile saved successfully!")
                 st.rerun()
 
@@ -220,7 +238,7 @@ def page_hrms_db(st, session_state, get_or_create_sheet, safe_get_all_records, n
     
     # Show more columns for HR/Management
     if session_state.role == "management" or session_state.email == "hr@morepenpdr.com":
-        display_df = df[['full_name', 'email', 'department', 'designation', 'phone', 'emergency_contact', 'present_address', 'permanent_address', 'updated_at']].copy()
+        display_df = df[['full_name', 'email', 'department', 'designation', 'phone', 'emergency_contact', 'present_address', 'permanent_address', 'transport_required', 'health_issues', 'updated_at']].copy()
     else:
         display_df = df[['full_name', 'email', 'department', 'designation', 'phone', 'updated_at']].copy()
     
