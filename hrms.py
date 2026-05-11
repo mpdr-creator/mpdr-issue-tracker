@@ -9,15 +9,15 @@ def all_hrms_profiles(get_or_create_sheet, safe_get_all_records):
         p_ws = get_or_create_sheet("hrms_profiles", ["email", "full_name", "designation", "department", "phone", "emergency_contact", "present_address", "permanent_address", "transport_required", "health_issues", "updated_at"])
         profiles = safe_get_all_records(p_ws)
         
-        # Fetch User registration data for fallbacks
-        u_ws = get_or_create_sheet("users", ["email", "password", "role", "department", "created_at"])
+        # Fetch User registration data for fallbacks - using 'dept' to match app.py
+        u_ws = get_or_create_sheet("users", ["email", "password", "role", "dept", "created_at"])
         users = safe_get_all_records(u_ws)
         
         # Create a merged map
         merged = {u["email"]: {
             "email": u["email"],
             "full_name": u["email"].split('@')[0].replace('.', ' ').title(),
-            "department": u.get("department", "Unknown Dept"),
+            "department": u.get("dept", "Unknown Dept"),
             "designation": "Staff",
             "phone": "",
             "emergency_contact": "",
@@ -38,7 +38,8 @@ def all_hrms_profiles(get_or_create_sheet, safe_get_all_records):
                     merged[email].update(p)
                     
         return list(merged.values())
-    except:
+    except Exception as e:
+        print(f"Error fetching profiles: {e}")
         return []
 
 def get_hrms_profile(email, get_or_create_sheet, safe_get_all_records):
