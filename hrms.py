@@ -220,27 +220,33 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
             ])
 
             # Custom Header for Behavioral Assessment
-            h1, h2, h3, h4 = st.columns([2, 4, 1, 4])
-            h1.markdown("**Key Performance Indicators**")
-            h2.markdown("**Target**")
-            h3.markdown("**Weight**")
-            h4.markdown("**Self-Assessment**")
-            st.markdown("<hr style='margin:0.5rem 0; border-top: 1px solid #ddd;'>", unsafe_allow_html=True)
+            h1, h2, h3, h4, h5 = st.columns([2, 3, 0.8, 3, 3])
+            h1.markdown("<div style='font-weight:bold; color:#0d2d5e;'>KPI</div>", unsafe_allow_html=True)
+            h2.markdown("<div style='font-weight:bold; color:#0d2d5e;'>Target</div>", unsafe_allow_html=True)
+            h3.markdown("<div style='font-weight:bold; color:#0d2d5e;'>Weight</div>", unsafe_allow_html=True)
+            h4.markdown("<div style='font-weight:bold; color:#0d2d5e;'>Self-Assessment</div>", unsafe_allow_html=True)
+            h5.markdown("<div style='font-weight:bold; color:#0d2d5e;'>Manager Assessment</div>", unsafe_allow_html=True)
+            st.markdown("<hr style='margin:0.5rem 0; border-top: 2px solid #0d2d5e;'>", unsafe_allow_html=True)
 
             behav_data = []
             for i, item in enumerate(behav_df_init.to_dict('records')):
-                c1, c2, c3, c4 = st.columns([2, 4, 1, 4])
+                c1, c2, c3, c4, c5 = st.columns([2, 3, 0.8, 3, 3])
                 c1.markdown(f"**{item['Key Performance Indicators']}**")
-                c2.markdown(item['Target'])
+                c2.markdown(f"<div style='font-size:0.9rem;'>{item['Target']}</div>", unsafe_allow_html=True)
                 c3.write(item['Weight'])
-                # Use text_area for wrapping input
+                
+                # Scientist input
                 self_val = c4.text_area(
-                    f"Assessment for {item['Key Performance Indicators']}", 
+                    f"Self Assessment {i}", 
                     key=f"behav_self_{i}",
-                    height=100,
+                    height=120,
                     label_visibility="collapsed",
-                    placeholder="Enter your self-assessment..."
+                    placeholder="Describe your performance..."
                 )
+                
+                # Manager Read-only placeholder
+                c5.info("Pending manager review")
+                
                 behav_data.append({
                     "Key Performance Indicators": item['Key Performance Indicators'],
                     "Target": item['Target'],
@@ -248,6 +254,7 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                     "Self-Assessment": self_val,
                     "Manager Assess": ""
                 })
+                st.markdown("<hr style='margin:0.3rem 0; border-top: 1px solid #eee;'>", unsafe_allow_html=True)
             
             submitted = st.form_submit_button("Submit KRA for Assessment", type="primary")
             if submitted:
