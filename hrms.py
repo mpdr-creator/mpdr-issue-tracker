@@ -217,7 +217,8 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                     "Self-Assessment": "", 
                     "Manager Assess": ""
                 }
-            ]
+            ])
+
             # Custom Header for Behavioral Assessment
             h1, h2, h3, h4 = st.columns([2, 4, 1, 4])
             h1.markdown("**Key Performance Indicators**")
