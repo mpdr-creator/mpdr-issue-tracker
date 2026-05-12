@@ -174,7 +174,15 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
             df_init = pd.DataFrame([
                 {"KPI": "", "SMART Target": "", "Weightage (%)": 0, "Self-Assessment": "", "Manager Assess": ""}
             ])
-            edited_df = st.data_editor(df_init, num_rows="dynamic", use_container_width=True, key="tech_eval_editor")
+            edited_df = st.data_editor(
+                df_init, 
+                num_rows="dynamic", 
+                use_container_width=True, 
+                key="tech_eval_editor",
+                column_config={
+                    "Manager Assess": st.column_config.TextColumn(disabled=True)
+                }
+            )
             
             st.markdown("---")
             st.markdown("#### Behavioral Assessment (20%)")
@@ -375,27 +383,58 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                         
                         st.markdown("#### Behavioral Assessment")
                         try:
-                            behav_list = json.loads(k.get("behavioral_assessment", "[]"))
+                            behav_val = k.get("behavioral_assessment", "[]")
+                            behav_list = json.loads(behav_val) if behav_val and behav_val != "" else []
                         except:
                             behav_list = []
                         
-                        if behav_list:
-                            df_behav = pd.DataFrame(behav_list)
-                            edited_behav_df = st.data_editor(
-                                df_behav, 
-                                num_rows="fixed", 
-                                use_container_width=True, 
-                                key=f"behav_edit_{k['kra_id']}",
-                                column_config={
-                                    "Key Performance Indicators": st.column_config.TextColumn(disabled=True),
-                                    "Target": st.column_config.TextColumn(disabled=True),
-                                    "Weight": st.column_config.TextColumn(disabled=True),
-                                    "Self-Assessment": st.column_config.TextColumn(disabled=True),
-                                    "Manager Assess": st.column_config.TextColumn("Manager Assess", help="Provide your evaluation")
+                        # If no behavioral data (old KRA), provide the template
+                        if not behav_list:
+                            behav_list = [
+                                {
+                                    "Key Performance Indicators": "Professional Communication", 
+                                    "Target": "• Share precise and well-structured updates in meetings and through written communication.\n• Ensure stakeholders are informed in advance about progress, risks, and concerns.", 
+                                    "Weight": "5%", 
+                                    "Self-Assessment": "N/A (Old KRA)", 
+                                    "Manager Assess": ""
+                                },
+                                {
+                                    "Key Performance Indicators": "Ownership & Accountability", 
+                                    "Target": "• Assume complete responsibility for assigned deliverables and honor committed timelines.\n• Identify potential risks early and communicate corrective actions proactively.", 
+                                    "Weight": "5%", 
+                                    "Self-Assessment": "N/A (Old KRA)", 
+                                    "Manager Assess": ""
+                                },
+                                {
+                                    "Key Performance Indicators": "Team Collaboration & Adaptability", 
+                                    "Target": "• Collaborate constructively with team members and other functions to achieve common goals.\n• Respond positively to priority changes while maintaining delivery standards.", 
+                                    "Weight": "5%", 
+                                    "Self-Assessment": "N/A (Old KRA)", 
+                                    "Manager Assess": ""
+                                },
+                                {
+                                    "Key Performance Indicators": "Professional Conduct & Learning Attitude", 
+                                    "Target": "• Consistently follow organizational guidelines, maintain discipline, and demonstrate professional behavior.\n• Enhance skills regularly and reflect the learning in day-to-day work.", 
+                                    "Weight": "5%", 
+                                    "Self-Assessment": "N/A (Old KRA)", 
+                                    "Manager Assess": ""
                                 }
-                            )
-                        else:
-                            edited_behav_df = pd.DataFrame()
+                            ]
+                        
+                        df_behav = pd.DataFrame(behav_list)
+                        edited_behav_df = st.data_editor(
+                            df_behav, 
+                            num_rows="fixed", 
+                            use_container_width=True, 
+                            key=f"behav_edit_{k['kra_id']}",
+                            column_config={
+                                "Key Performance Indicators": st.column_config.TextColumn(disabled=True),
+                                "Target": st.column_config.TextColumn(disabled=True),
+                                "Weight": st.column_config.TextColumn(disabled=True),
+                                "Self-Assessment": st.column_config.TextColumn(disabled=True),
+                                "Manager Assess": st.column_config.TextColumn("Manager Assess", help="Provide your evaluation")
+                            }
+                        )
                         
                         st.markdown("---")
                         notes = st.text_area("General Assessment Notes / Feedback")
