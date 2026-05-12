@@ -217,26 +217,41 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                     "Self-Assessment": "", 
                     "Manager Assess": ""
                 }
-            ])
-            edited_behav_df = st.data_editor(
-                behav_df_init, 
-                num_rows="fixed", 
-                use_container_width=True, 
-                key="behav_eval_editor",
-                column_config={
-                    "Key Performance Indicators": st.column_config.TextColumn(width="medium", disabled=True),
-                    "Target": st.column_config.TextColumn(width="large", disabled=True),
-                    "Weight": st.column_config.TextColumn(disabled=True),
-                    "Self-Assessment": st.column_config.TextColumn("Self-Assessment", help="Provide your self-evaluation", required=True),
-                    "Manager Assess": st.column_config.TextColumn(disabled=True)
-                }
-            )
+            ]
+            # Custom Header for Behavioral Assessment
+            h1, h2, h3, h4 = st.columns([2, 4, 1, 4])
+            h1.markdown("**Key Performance Indicators**")
+            h2.markdown("**Target**")
+            h3.markdown("**Weight**")
+            h4.markdown("**Self-Assessment**")
+            st.markdown("<hr style='margin:0.5rem 0; border-top: 1px solid #ddd;'>", unsafe_allow_html=True)
+
+            behav_data = []
+            for i, item in enumerate(behav_df_init):
+                c1, c2, c3, c4 = st.columns([2, 4, 1, 4])
+                c1.markdown(f"**{item['Key Performance Indicators']}**")
+                c2.markdown(item['Target'])
+                c3.write(item['Weight'])
+                # Use text_area for wrapping input
+                self_val = c4.text_area(
+                    f"Assessment for {item['Key Performance Indicators']}", 
+                    key=f"behav_self_{i}",
+                    height=100,
+                    label_visibility="collapsed",
+                    placeholder="Enter your self-assessment..."
+                )
+                behav_data.append({
+                    "Key Performance Indicators": item['Key Performance Indicators'],
+                    "Target": item['Target'],
+                    "Weight": item['Weight'],
+                    "Self-Assessment": self_val,
+                    "Manager Assess": ""
+                })
             
             submitted = st.form_submit_button("Submit KRA for Assessment", type="primary")
             if submitted:
                 with st.spinner("Submitting KRA..."):
                     tech_data = edited_df.to_dict('records')
-                    behav_data = edited_behav_df.to_dict('records')
                     # Pass empty strings for removed fields
                     submit_kra(email, year, quarter, "", "", "", tech_data, behav_data, get_or_create_sheet, safe_get_all_records, now_ist)
                 st.success("KRA submitted successfully!")
@@ -421,20 +436,37 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                                 }
                             ]
                         
-                        df_behav = pd.DataFrame(behav_list)
-                        edited_behav_df = st.data_editor(
-                            df_behav, 
-                            num_rows="fixed", 
-                            use_container_width=True, 
-                            key=f"behav_edit_{k['kra_id']}",
-                            column_config={
-                                "Key Performance Indicators": st.column_config.TextColumn(width="medium", disabled=True),
-                                "Target": st.column_config.TextColumn(width="large", disabled=True),
-                                "Weight": st.column_config.TextColumn(disabled=True),
-                                "Self-Assessment": st.column_config.TextColumn(disabled=True),
-                                "Manager Assess": st.column_config.TextColumn("Manager Assess", help="Provide your evaluation")
-                            }
-                        )
+                        # Custom Header for Manager Assessment
+                        h1, h2, h3, h4, h5 = st.columns([2, 3, 1, 3, 3])
+                        h1.markdown("**KPI**")
+                        h2.markdown("**Target**")
+                        h3.markdown("**Weight**")
+                        h4.markdown("**Self-Assessment**")
+                        h5.markdown("**Manager Assess**")
+                        st.markdown("<hr style='margin:0.5rem 0; border-top: 1px solid #ddd;'>", unsafe_allow_html=True)
+
+                        edited_behav_list = []
+                        for i, item in enumerate(behav_list):
+                            c1, c2, c3, c4, c5 = st.columns([2, 3, 1, 3, 3])
+                            c1.markdown(f"**{item['Key Performance Indicators']}**")
+                            c2.markdown(item['Target'])
+                            c3.write(item['Weight'])
+                            c4.info(item.get('Self-Assessment', 'N/A'))
+                            
+                            # Manager input
+                            mgr_val = c5.text_area(
+                                f"Manager Assess for {item['Key Performance Indicators']}",
+                                value=item.get('Manager Assess', ''),
+                                key=f"behav_mgr_{k['kra_id']}_{i}",
+                                height=100,
+                                label_visibility="collapsed"
+                            )
+                            
+                            edited_behav_list.append({
+                                **item,
+                                "Manager Assess": mgr_val
+                            })
+                        behav_data = edited_behav_list
                         
                         st.markdown("---")
                         notes = st.text_area("General Assessment Notes / Feedback")
@@ -443,7 +475,7 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                         if st.form_submit_button("Submit Assessment", type="primary"):
                             with st.spinner("Saving assessment..."):
                                 tech_data = edited_tech_df.to_dict('records') if not edited_tech_df.empty else []
-                                behav_data = edited_behav_df.to_dict('records') if not edited_behav_df.empty else []
+                                # behav_data already prepared in loop
                                 assess_kra(k['kra_id'], notes, rating, tech_data, behav_data, get_or_create_sheet, safe_get_all_records, now_ist)
                             st.success("Assessment saved!")
                             st.rerun()
