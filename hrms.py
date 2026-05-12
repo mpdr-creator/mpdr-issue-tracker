@@ -328,6 +328,14 @@ def page_hrms_db(st, session_state, get_or_create_sheet, safe_get_all_records, n
         
     df = pd.DataFrame(profiles)
     
+    # Filter: Only show profiles where personal info has been filled
+    # We check if phone or present_address is not empty
+    df = df[(df['phone'] != "") | (df['present_address'] != "")]
+    
+    if df.empty:
+        st.info("No employees have completed their profiles yet.")
+        return
+    
     # Show more columns for HR/Management
     if session_state.role == "management" or session_state.email == "hr@morepenpdr.com":
         display_df = df[['full_name', 'email', 'department', 'designation', 'phone', 'emergency_contact', 'present_address', 'permanent_address', 'transport_required', 'health_issues', 'updated_at']].copy()
