@@ -228,7 +228,7 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
             st.markdown("<hr style='margin:0.5rem 0; border-top: 1px solid #ddd;'>", unsafe_allow_html=True)
 
             behav_data = []
-            for i, item in enumerate(behav_df_init):
+            for i, item in enumerate(behav_df_init.to_dict('records')):
                 c1, c2, c3, c4 = st.columns([2, 4, 1, 4])
                 c1.markdown(f"**{item['Key Performance Indicators']}**")
                 c2.markdown(item['Target'])
