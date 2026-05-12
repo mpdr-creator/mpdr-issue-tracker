@@ -224,10 +224,10 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                 use_container_width=True, 
                 key="behav_eval_editor",
                 column_config={
-                    "Key Performance Indicators": st.column_config.TextColumn(disabled=True),
-                    "Target": st.column_config.TextColumn(disabled=True),
+                    "Key Performance Indicators": st.column_config.TextColumn(width="medium", disabled=True),
+                    "Target": st.column_config.TextColumn(width="large", disabled=True),
                     "Weight": st.column_config.TextColumn(disabled=True),
-                    "Self-Assessment": st.column_config.TextColumn("Self-Assessment", help="Provide your evaluation"),
+                    "Self-Assessment": st.column_config.TextColumn("Self-Assessment", help="Provide your self-evaluation", required=True),
                     "Manager Assess": st.column_config.TextColumn(disabled=True)
                 }
             )
@@ -428,8 +428,8 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                             use_container_width=True, 
                             key=f"behav_edit_{k['kra_id']}",
                             column_config={
-                                "Key Performance Indicators": st.column_config.TextColumn(disabled=True),
-                                "Target": st.column_config.TextColumn(disabled=True),
+                                "Key Performance Indicators": st.column_config.TextColumn(width="medium", disabled=True),
+                                "Target": st.column_config.TextColumn(width="large", disabled=True),
                                 "Weight": st.column_config.TextColumn(disabled=True),
                                 "Self-Assessment": st.column_config.TextColumn(disabled=True),
                                 "Manager Assess": st.column_config.TextColumn("Manager Assess", help="Provide your evaluation")
