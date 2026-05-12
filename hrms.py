@@ -61,26 +61,28 @@ def update_hrms_profile(email, full_name, designation, department, phone, emerge
 
 def all_hrms_kras(get_or_create_sheet, safe_get_all_records):
     try:
-        ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating"])
+        ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
         return safe_get_all_records(ws)
     except:
         return []
 
-def submit_kra(email, year, quarter, objectives, achievements, challenges, tech_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
-    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating"])
+def submit_kra(email, year, quarter, objectives, achievements, challenges, tech_assessment, behavioral_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
+    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
     kra_id = str(uuid.uuid4())[:8].upper()
     now = now_ist().strftime("%Y-%m-%d %H:%M:%S")
     tech_json = json.dumps(tech_assessment)
-    ws.append_row([kra_id, email, year, quarter, objectives, achievements, challenges, tech_json, "SUBMITTED", now, "", "", ""])
+    behav_json = json.dumps(behavioral_assessment)
+    ws.append_row([kra_id, email, year, quarter, objectives, achievements, challenges, tech_json, "SUBMITTED", now, "", "", "", behav_json])
 
-def assess_kra(kra_id, notes, rating, tech_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
-    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating"])
+def assess_kra(kra_id, notes, rating, tech_assessment, behavioral_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
+    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
     recs = safe_get_all_records(ws)
     now = now_ist().strftime("%Y-%m-%d %H:%M:%S")
     tech_json = json.dumps(tech_assessment)
+    behav_json = json.dumps(behavioral_assessment)
     for i, r in enumerate(recs, start=2):
         if str(r.get("kra_id", "")) == kra_id:
-            ws.update(f"H{i}:M{i}", [[tech_json, "ASSESSED", r["submitted_at"], now, notes, rating]])
+            ws.update(f"H{i}:N{i}", [[tech_json, "ASSESSED", r["submitted_at"], now, notes, rating, behav_json]])
             return
 
 # UI Rendering functions
@@ -174,12 +176,61 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
             ])
             edited_df = st.data_editor(df_init, num_rows="dynamic", use_container_width=True, key="tech_eval_editor")
             
+            st.markdown("---")
+            st.markdown("#### Behavioral Assessment (20%)")
+            st.info("💡 Review the key performance indicators and targets below. Fill in your Self-Assessment.")
+            
+            behav_df_init = pd.DataFrame([
+                {
+                    "Key Performance Indicators": "Professional Communication", 
+                    "Target": "• Share precise and well-structured updates in meetings and through written communication.\n• Ensure stakeholders are informed in advance about progress, risks, and concerns.", 
+                    "Weight": "5%", 
+                    "Self-Assessment": "", 
+                    "Manager Assess": ""
+                },
+                {
+                    "Key Performance Indicators": "Ownership & Accountability", 
+                    "Target": "• Assume complete responsibility for assigned deliverables and honor committed timelines.\n• Identify potential risks early and communicate corrective actions proactively.", 
+                    "Weight": "5%", 
+                    "Self-Assessment": "", 
+                    "Manager Assess": ""
+                },
+                {
+                    "Key Performance Indicators": "Team Collaboration & Adaptability", 
+                    "Target": "• Collaborate constructively with team members and other functions to achieve common goals.\n• Respond positively to priority changes while maintaining delivery standards.", 
+                    "Weight": "5%", 
+                    "Self-Assessment": "", 
+                    "Manager Assess": ""
+                },
+                {
+                    "Key Performance Indicators": "Professional Conduct & Learning Attitude", 
+                    "Target": "• Consistently follow organizational guidelines, maintain discipline, and demonstrate professional behavior.\n• Enhance skills regularly and reflect the learning in day-to-day work.", 
+                    "Weight": "5%", 
+                    "Self-Assessment": "", 
+                    "Manager Assess": ""
+                }
+            ])
+            edited_behav_df = st.data_editor(
+                behav_df_init, 
+                num_rows="fixed", 
+                use_container_width=True, 
+                key="behav_eval_editor",
+                column_config={
+                    "Key Performance Indicators": st.column_config.TextColumn(disabled=True),
+                    "Target": st.column_config.TextColumn(disabled=True),
+                    "Weight": st.column_config.TextColumn(disabled=True),
+                    "Self-Assessment": st.column_config.TextColumn("Self-Assessment", help="Provide your evaluation"),
+                    "Manager Assess": st.column_config.TextColumn(disabled=True)
+                }
+            )
+            
             submitted = st.form_submit_button("Submit KRA for Assessment", type="primary")
             if submitted:
                 with st.spinner("Submitting KRA..."):
                     tech_data = edited_df.to_dict('records')
+                    behav_data = edited_behav_df.to_dict('records')
                     # Pass empty strings for removed fields
-                    submit_kra(email, year, quarter, "", "", "", tech_data, get_or_create_sheet, safe_get_all_records, now_ist)
+                    submit_kra(email, year, quarter, "", "", "", tech_data, behav_data, get_or_create_sheet, safe_get_all_records, now_ist)
                 st.success("KRA submitted successfully!")
                 st.rerun()
                     
@@ -206,6 +257,15 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                         if tech_list:
                             st.markdown("<strong>Technical Assessment:</strong>", unsafe_allow_html=True)
                             st.dataframe(pd.DataFrame(tech_list), use_container_width=True, hide_index=True)
+                    except:
+                        pass
+                
+                if k.get("behavioral_assessment"):
+                    try:
+                        behav_list = json.loads(k["behavioral_assessment"])
+                        if behav_list:
+                            st.markdown("<strong>Behavioral Assessment:</strong>", unsafe_allow_html=True)
+                            st.dataframe(pd.DataFrame(behav_list), use_container_width=True, hide_index=True)
                     except:
                         pass
                 
@@ -313,6 +373,30 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                             st.warning("No technical assessment data found.")
                             edited_tech_df = pd.DataFrame()
                         
+                        st.markdown("#### Behavioral Assessment")
+                        try:
+                            behav_list = json.loads(k.get("behavioral_assessment", "[]"))
+                        except:
+                            behav_list = []
+                        
+                        if behav_list:
+                            df_behav = pd.DataFrame(behav_list)
+                            edited_behav_df = st.data_editor(
+                                df_behav, 
+                                num_rows="fixed", 
+                                use_container_width=True, 
+                                key=f"behav_edit_{k['kra_id']}",
+                                column_config={
+                                    "Key Performance Indicators": st.column_config.TextColumn(disabled=True),
+                                    "Target": st.column_config.TextColumn(disabled=True),
+                                    "Weight": st.column_config.TextColumn(disabled=True),
+                                    "Self-Assessment": st.column_config.TextColumn(disabled=True),
+                                    "Manager Assess": st.column_config.TextColumn("Manager Assess", help="Provide your evaluation")
+                                }
+                            )
+                        else:
+                            edited_behav_df = pd.DataFrame()
+                        
                         st.markdown("---")
                         notes = st.text_area("General Assessment Notes / Feedback")
                         rating = st.slider("Overall Rating (1-5)", 1, 5, 3)
@@ -320,7 +404,8 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                         if st.form_submit_button("Submit Assessment", type="primary"):
                             with st.spinner("Saving assessment..."):
                                 tech_data = edited_tech_df.to_dict('records') if not edited_tech_df.empty else []
-                                assess_kra(k['kra_id'], notes, rating, tech_data, get_or_create_sheet, safe_get_all_records, now_ist)
+                                behav_data = edited_behav_df.to_dict('records') if not edited_behav_df.empty else []
+                                assess_kra(k['kra_id'], notes, rating, tech_data, behav_data, get_or_create_sheet, safe_get_all_records, now_ist)
                             st.success("Assessment saved!")
                             st.rerun()
                             
@@ -348,6 +433,15 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                         if tech_list:
                             st.markdown("<strong>Technical Assessment:</strong>", unsafe_allow_html=True)
                             st.dataframe(pd.DataFrame(tech_list), use_container_width=True, hide_index=True)
+                    except:
+                        pass
+                
+                if k.get("behavioral_assessment"):
+                    try:
+                        behav_list = json.loads(k["behavioral_assessment"])
+                        if behav_list:
+                            st.markdown("<strong>Behavioral Assessment:</strong>", unsafe_allow_html=True)
+                            st.dataframe(pd.DataFrame(behav_list), use_container_width=True, hide_index=True)
                     except:
                         pass
                 
