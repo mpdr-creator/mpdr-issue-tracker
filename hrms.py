@@ -172,7 +172,7 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
             st.info("💡 You can add/edit rows in the table below. Fill your KPI, Target, Weightage, and Self-Assessment.")
             
             df_init = pd.DataFrame([
-                {"KPI": "", "SMART Target": "", "Weightage (%)": 0, "Self-Assessment": "", "Manager Assess": ""}
+                {"KPI": "", "Target": "", "Weightage (%)": 0, "Self-Assessment": "", "Manager Assess": ""}
             ])
             edited_df = st.data_editor(
                 df_init, 
@@ -370,24 +370,51 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
     profiles = all_hrms_profiles(get_or_create_sheet, safe_get_all_records)
     prof_map = {p["email"]: p for p in profiles}
 
-    # Robust filtering: strip spaces and convert to upper case
+    # Split KRAs
     pending = [k for k in kras if str(k.get("status", "")).strip().upper() == "SUBMITTED"]
     assessed = [k for k in kras if str(k.get("status", "")).strip().upper() == "ASSESSED"]
     
-    tab1, tab2 = st.tabs([f"Pending Assessment ({len(pending)})", f"Assessed ({len(assessed)})"])
+    tab1, tab2 = st.tabs([f"Pending Assessment ({len(pending)})", f"Assessment History ({len(assessed)})"])
     
     with tab1:
         if not pending:
-            st.info("No KRAs are currently pending assessment.")
+            st.success("🎉 All pending KRAs have been assessed!")
         else:
-            for k in pending:
-                p = prof_map.get(k["email"], {})
-                name = p.get("full_name", k["email"])
-                dept = p.get("department", "Unknown Dept")
+            # 1. Select Employee
+            pending_emails = sorted(list(set(k["email"] for k in pending)))
+            
+            def get_emp_label(email):
+                p = prof_map.get(email, {})
+                name = p.get("full_name", email)
+                dept = p.get("department", "Unknown")
+                return f"{name} ({dept})"
+
+            selected_email = st.selectbox("1. Select Employee", pending_emails, format_func=get_emp_label)
+            
+            if selected_email:
+                # 2. Select Year and Quarter for this employee
+                emp_pending = [k for k in pending if k["email"] == selected_email]
                 
-                with st.expander(f"KRA: {name} ({dept}) | {k['year']} {k['quarter']}"):
+                years = sorted(list(set(k["year"] for k in emp_pending)), reverse=True)
+                col_y, col_q = st.columns(2)
+                
+                with col_y:
+                    selected_year = st.selectbox("2. Select Year", years)
+                
+                with col_q:
+                    available_quarters = sorted(list(set(k["quarter"] for k in emp_pending if k["year"] == selected_year)))
+                    selected_quarter = st.selectbox("3. Select Quarter / Cycle", available_quarters)
+                
+                # 3. Find the specific KRA
+                k = next((k for k in emp_pending if k["year"] == selected_year and k["quarter"] == selected_quarter), None)
+                
+                if k:
+                    st.markdown("---")
                     with st.form(f"assess_form_{k['kra_id']}"):
-                        st.markdown("#### Technical Assessment")
+                        st.markdown(f"#### Evaluation for {get_emp_label(selected_email)} - {selected_year} {selected_quarter}")
+                        
+                        # Technical Assessment
+                        st.markdown("##### Technical Assessment")
                         try:
                             tech_list = json.loads(k.get("tech_assessment", "[]"))
                         except:
@@ -412,46 +439,23 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                             st.warning("No technical assessment data found.")
                             edited_tech_df = pd.DataFrame()
                         
-                        st.markdown("#### Behavioral Assessment")
+                        # Behavioral Assessment
+                        st.markdown("##### Behavioral Assessment")
                         try:
                             behav_val = k.get("behavioral_assessment", "[]")
                             behav_list = json.loads(behav_val) if behav_val and behav_val != "" else []
                         except:
                             behav_list = []
                         
-                        # If no behavioral data (old KRA), provide the template
                         if not behav_list:
+                            # Fallback template for legacy KRAs
                             behav_list = [
-                                {
-                                    "Key Performance Indicators": "Professional Communication", 
-                                    "Target": "• Share precise and well-structured updates in meetings and through written communication.\n• Ensure stakeholders are informed in advance about progress, risks, and concerns.", 
-                                    "Weight": "5%", 
-                                    "Self-Assessment": "N/A (Old KRA)", 
-                                    "Manager Assess": ""
-                                },
-                                {
-                                    "Key Performance Indicators": "Ownership & Accountability", 
-                                    "Target": "• Assume complete responsibility for assigned deliverables and honor committed timelines.\n• Identify potential risks early and communicate corrective actions proactively.", 
-                                    "Weight": "5%", 
-                                    "Self-Assessment": "N/A (Old KRA)", 
-                                    "Manager Assess": ""
-                                },
-                                {
-                                    "Key Performance Indicators": "Team Collaboration & Adaptability", 
-                                    "Target": "• Collaborate constructively with team members and other functions to achieve common goals.\n• Respond positively to priority changes while maintaining delivery standards.", 
-                                    "Weight": "5%", 
-                                    "Self-Assessment": "N/A (Old KRA)", 
-                                    "Manager Assess": ""
-                                },
-                                {
-                                    "Key Performance Indicators": "Professional Conduct & Learning Attitude", 
-                                    "Target": "• Consistently follow organizational guidelines, maintain discipline, and demonstrate professional behavior.\n• Enhance skills regularly and reflect the learning in day-to-day work.", 
-                                    "Weight": "5%", 
-                                    "Self-Assessment": "N/A (Old KRA)", 
-                                    "Manager Assess": ""
-                                }
+                                {"Key Performance Indicators": "Professional Communication", "Target": "...", "Weight": "5%", "Self-Assessment": "N/A", "Manager Assess": ""},
+                                {"Key Performance Indicators": "Ownership & Accountability", "Target": "...", "Weight": "5%", "Self-Assessment": "N/A", "Manager Assess": ""},
+                                {"Key Performance Indicators": "Team Collaboration & Adaptability", "Target": "...", "Weight": "5%", "Self-Assessment": "N/A", "Manager Assess": ""},
+                                {"Key Performance Indicators": "Professional Conduct & Learning Attitude", "Target": "...", "Weight": "5%", "Self-Assessment": "N/A", "Manager Assess": ""}
                             ]
-                        
+
                         # Custom Header for Manager Assessment
                         h1, h2, h3, h4, h5 = st.columns([2, 3, 1, 3, 3])
                         h1.markdown("**KPI**")
@@ -469,7 +473,6 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                             c3.write(item['Weight'])
                             c4.info(item.get('Self-Assessment', 'N/A'))
                             
-                            # Manager input
                             mgr_val = c5.text_area(
                                 f"Manager Assess for {item['Key Performance Indicators']}",
                                 value=item.get('Manager Assess', ''),
@@ -478,10 +481,8 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                                 label_visibility="collapsed"
                             )
                             
-                            edited_behav_list.append({
-                                **item,
-                                "Manager Assess": mgr_val
-                            })
+                            edited_behav_list.append({**item, "Manager Assess": mgr_val})
+                        
                         behav_data = edited_behav_list
                         
                         st.markdown("---")
@@ -491,11 +492,10 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                         if st.form_submit_button("Submit Assessment", type="primary"):
                             with st.spinner("Saving assessment..."):
                                 tech_data = edited_tech_df.to_dict('records') if not edited_tech_df.empty else []
-                                # behav_data already prepared in loop
                                 assess_kra(k['kra_id'], notes, rating, tech_data, behav_data, get_or_create_sheet, safe_get_all_records, now_ist)
                             st.success("Assessment saved!")
                             st.rerun()
-                            
+
     with tab2:
         if not assessed:
             st.info("No assessed KRAs.")
