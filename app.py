@@ -286,9 +286,9 @@ def get_or_create_sheet(name, cols):
         ws = client.add_worksheet(title=name, rows=1000, cols=len(cols))
         ws.append_row(cols)
     ws = client.worksheet(name)
-    # Ensure headers match schema so get_all_records() works for all columns
+    # Ensure headers match schema exactly
     existing = ws.row_values(1)
-    if len(existing) < len(cols):
+    if existing != cols:
         ws.update("A1", [cols])
     return ws
 
