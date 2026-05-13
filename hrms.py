@@ -85,6 +85,14 @@ def assess_kra(kra_id, notes, rating, tech_assessment, behavioral_assessment, ge
             ws.update(f"H{i}:N{i}", [[tech_json, "ASSESSED", r["submitted_at"], now, notes, rating, behav_json]])
             return
 
+def delete_kra(kra_id, get_or_create_sheet, safe_get_all_records):
+    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
+    recs = safe_get_all_records(ws)
+    for i, r in enumerate(recs, start=2):
+        if str(r.get("kra_id", "")) == kra_id:
+            ws.delete_rows(i)
+            return
+
 # UI Rendering functions
 def page_hrms_profile(st, session_state, get_or_create_sheet, safe_get_all_records, now_ist):
     st.markdown("""
@@ -162,13 +170,20 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
         with st.form("kra_form"):
             col1, col2 = st.columns(2)
             with col1:
-                year = st.selectbox("Year", ["2024", "2025", "2026"])
+                year = st.selectbox("Year", ["2024", "2025", "2026", "2027"])
             with col2:
-                quarter = st.selectbox("Quarter / Cycle", ["Q1", "Q2", "Q3", "Q4", "Annual"])
-                
+                quarter = st.selectbox("Quarter / Cycle", ["Q1", "Q2", "Q3", "Q4", "Half-Yearly", "Annual"])
+
+            # Check for existing submission
+            existing_kra = next((k for k in kras if str(k["year"]) == str(year) and str(k["quarter"]) == str(quarter)), None)
             
-            st.markdown("---")
-            st.markdown("#### Technical Assessment")
+            if existing_kra:
+                st.warning(f"⚠️ You have already submitted a KRA for **{year} {quarter}**. You cannot submit another one for the same period.")
+                st.info("If you need to make changes, please delete your existing entry from the 'My Previous KRAs' tab first.")
+                st.form_submit_button("Submit KRA for Assessment", type="primary", disabled=True)
+            else:
+                st.markdown("---")
+                st.markdown("#### Technical Assessment")
             st.info("💡 You can add/edit rows in the table below. Fill your KPI, Target, Weightage, and Self-Assessment.")
             
             df_init = pd.DataFrame([
@@ -194,21 +209,21 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                     "Target": "• Share precise and well-structured updates in meetings and through written communication.\n• Ensure stakeholders are informed in advance about progress, risks, and concerns.", 
                     "Weight": "5%", 
                     "Self-Assessment": "", 
-                    "Manager Assess": ""
+                    "Manager Assessment": ""
                 },
                 {
                     "Key Performance Indicators": "Ownership & Accountability", 
                     "Target": "• Assume complete responsibility for assigned deliverables and honor committed timelines.\n• Identify potential risks early and communicate corrective actions proactively.", 
                     "Weight": "5%", 
                     "Self-Assessment": "", 
-                    "Manager Assess": ""
+                    "Manager Assessment": ""
                 },
                 {
                     "Key Performance Indicators": "Team Collaboration & Adaptability", 
                     "Target": "• Collaborate constructively with team members and other functions to achieve common goals.\n• Respond positively to priority changes while maintaining delivery standards.", 
                     "Weight": "5%", 
                     "Self-Assessment": "", 
-                    "Manager Assess": ""
+                    "Manager Assessment": ""
                 },
                 {
                     "Key Performance Indicators": "Professional Conduct & Learning Attitude", 
@@ -275,7 +290,6 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
             for k in reversed(kras):
                 status = str(k.get("status", "")).strip()
                 status_color = "#f0a500" if status == "SUBMITTED" else "#3fb950"
-                
                 st.markdown(f"""
                 <div style="background:white;padding:1.5rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.05);margin-bottom:1rem;border-left:4px solid {status_color};">
                     <div style="display:flex;justify-content:space-between;margin-bottom:1rem;">
@@ -283,6 +297,13 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                         <span style="background:{status_color};color:white;padding:4px 12px;border-radius:20px;font-size:0.8rem;font-weight:bold;">{status}</span>
                     </div>
                 """, unsafe_allow_html=True)
+                
+                # Delete option
+                if st.button(f"🗑️ Delete {k['year']} {k['quarter']} KRA", key=f"del_{k['kra_id']}", type="secondary"):
+                    with st.spinner("Deleting record..."):
+                        delete_kra(k['kra_id'], get_or_create_sheet, safe_get_all_records)
+                    st.success("KRA deleted successfully!")
+                    st.rerun()
                 
                 # Always show tech assessment table if available
                 if k.get("tech_assessment"):
@@ -408,8 +429,9 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                     available_quarters = sorted(list(set(k["quarter"] for k in emp_pending if k["year"] == selected_year)))
                     selected_quarter = st.selectbox("3. Select Quarter / Cycle", available_quarters)
                 
-                # 3. Find the specific KRA
-                k = next((k for k in emp_pending if k["year"] == selected_year and k["quarter"] == selected_quarter), None)
+                # 3. Find the specific KRA (Pick latest if duplicates exist)
+                emp_pending_sorted = sorted(emp_pending, key=lambda x: x.get("submitted_at", ""), reverse=True)
+                k = next((k for k in emp_pending_sorted if str(k["year"]) == str(selected_year) and str(k["quarter"]) == str(selected_quarter)), None)
                 
                 if k:
                     st.markdown("---")
@@ -457,21 +479,21 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                                     "Key Performance Indicators": "Professional Communication", 
                                     "Target": "• Share precise and well-structured updates in meetings and through written communication.\n• Ensure stakeholders are informed in advance about progress, risks, and concerns.", 
                                     "Weight": "5%", 
-                                    "Self-Assessment": "Not provided (Legacy KRA)", 
+                                    "Self-Assessment": "N/A", 
                                     "Manager Assessment": ""
                                 },
                                 {
                                     "Key Performance Indicators": "Ownership & Accountability", 
                                     "Target": "• Assume complete responsibility for assigned deliverables and honor committed timelines.\n• Identify potential risks early and communicate corrective actions proactively.", 
                                     "Weight": "5%", 
-                                    "Self-Assessment": "Not provided (Legacy KRA)", 
+                                    "Self-Assessment": "N/A", 
                                     "Manager Assessment": ""
                                 },
                                 {
                                     "Key Performance Indicators": "Team Collaboration & Adaptability", 
                                     "Target": "• Collaborate constructively with team members and other functions to achieve common goals.\n• Respond positively to priority changes while maintaining delivery standards.", 
                                     "Weight": "5%", 
-                                    "Self-Assessment": "Not provided (Legacy KRA)", 
+                                    "Self-Assessment": "N/A", 
                                     "Manager Assessment": ""
                                 },
                                 {
