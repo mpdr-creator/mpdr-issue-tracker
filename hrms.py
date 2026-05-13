@@ -66,6 +66,30 @@ def all_hrms_kras(get_or_create_sheet, safe_get_all_records):
     except:
         return []
 
+def render_kra_table(st, data_list, headers):
+    if not data_list: return
+    
+    # Create HTML Table
+    header_html = "".join([f'<th style="background:#f8fafc;color:#475569;padding:12px;text-align:left;border-bottom:2px solid #e2e8f0;font-weight:600;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.025em;">{h}</th>' for h in headers])
+    
+    rows_html = ""
+    for item in data_list:
+        row_cells = ""
+        for h in headers:
+            val = item.get(h, "")
+            # Apply wrapping and padding
+            row_cells += f'<td style="padding:12px;border-bottom:1px solid #f1f5f9;color:#1e293b;font-size:0.9rem;line-height:1.5;vertical-align:top;word-wrap:break-word;max-width:300px;">{val}</td>'
+        rows_html += f'<tr>{row_cells}</tr>'
+        
+    st.markdown(f"""
+    <div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.05);margin-bottom:1.5rem;background:white;">
+        <table style="width:100%;border-collapse:collapse;table-layout:auto;">
+            <thead><tr>{header_html}</tr></thead>
+            <tbody>{rows_html}</tbody>
+        </table>
+    </div>
+    """, unsafe_allow_html=True)
+
 def submit_kra(email, year, quarter, objectives, achievements, challenges, tech_assessment, behavioral_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
     ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
     kra_id = str(uuid.uuid4())[:8].upper()
@@ -314,19 +338,8 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                     try:
                         tech_list = json.loads(k["tech_assessment"])
                         if tech_list:
-                            st.markdown("<strong>Technical Assessment:</strong>", unsafe_allow_html=True)
-                            st.dataframe(
-                                pd.DataFrame(tech_list), 
-                                use_container_width=True, 
-                                hide_index=True,
-                                column_config={
-                                    "KPI": st.column_config.TextColumn(width="medium"),
-                                    "Target": st.column_config.TextColumn(width="large"),
-                                    "Weightage (%)": st.column_config.NumberColumn(format="%d%%"),
-                                    "Self-Assessment": st.column_config.TextColumn(width="medium"),
-                                    "Manager Assessment": st.column_config.TextColumn(width="medium")
-                                }
-                            )
+                            st.markdown("<div style='margin-bottom:8px;font-weight:600;color:#334155;font-size:0.95rem;'>Technical Assessment:</div>", unsafe_allow_html=True)
+                            render_kra_table(st, tech_list, ["KPI", "Target", "Weightage (%)", "Self-Assessment", "Manager Assessment"])
                     except:
                         pass
                 
@@ -334,19 +347,8 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                     try:
                         behav_list = json.loads(k["behavioral_assessment"])
                         if behav_list:
-                            st.markdown("<strong>Behavioral Assessment:</strong>", unsafe_allow_html=True)
-                            st.dataframe(
-                                pd.DataFrame(behav_list), 
-                                use_container_width=True, 
-                                hide_index=True,
-                                column_config={
-                                    "Key Performance Indicators": st.column_config.TextColumn(width="medium"),
-                                    "Target": st.column_config.TextColumn(width="large"),
-                                    "Weight": st.column_config.TextColumn(width="small"),
-                                    "Self-Assessment": st.column_config.NumberColumn(format="%d"),
-                                    "Manager Assessment": st.column_config.TextColumn(width="medium")
-                                }
-                            )
+                            st.markdown("<div style='margin-top:0.5rem;margin-bottom:8px;font-weight:600;color:#334155;font-size:0.95rem;'>Behavioral Assessment:</div>", unsafe_allow_html=True)
+                            render_kra_table(st, behav_list, ["Key Performance Indicators", "Target", "Weight", "Self-Assessment", "Manager Assessment"])
                     except:
                         pass
                 
