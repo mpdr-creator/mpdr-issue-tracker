@@ -9,15 +9,15 @@ def all_hrms_profiles(get_or_create_sheet, safe_get_all_records):
         p_ws = get_or_create_sheet("hrms_profiles", ["email", "full_name", "designation", "department", "phone", "emergency_contact", "present_address", "permanent_address", "transport_required", "health_issues", "updated_at"])
         profiles = safe_get_all_records(p_ws)
         
-        # Fetch User registration data for fallbacks - using 'dept' to match app.py
-        u_ws = get_or_create_sheet("users", ["email", "password", "role", "dept", "created_at"])
+        # Fetch User registration data for fallbacks
+        u_ws = get_or_create_sheet("users", ["email", "password", "role", "department", "created_at"])
         users = safe_get_all_records(u_ws)
         
         # Create a merged map
         merged = {u["email"]: {
             "email": u["email"],
             "full_name": u["email"].split('@')[0].replace('.', ' ').title(),
-            "department": u.get("dept", "Unknown Dept"),
+            "department": u.get("department", "Unknown Dept"),
             "designation": "Staff",
             "phone": "",
             "emergency_contact": "",
@@ -73,6 +73,7 @@ def submit_kra(email, year, quarter, objectives, achievements, challenges, tech_
     tech_json = json.dumps(tech_assessment)
     behav_json = json.dumps(behavioral_assessment)
     ws.append_row([kra_id, email, year, quarter, objectives, achievements, challenges, tech_json, "SUBMITTED", now, "", "", "", behav_json])
+    st.cache_data.clear()
 
 def assess_kra(kra_id, notes, rating, tech_assessment, behavioral_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
     ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
@@ -91,6 +92,7 @@ def delete_kra(kra_id, get_or_create_sheet, safe_get_all_records):
     for i, r in enumerate(recs, start=2):
         if str(r.get("kra_id", "")) == kra_id:
             ws.delete_rows(i)
+            st.cache_data.clear()
             return
 
 # UI Rendering functions
