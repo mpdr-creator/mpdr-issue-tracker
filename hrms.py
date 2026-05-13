@@ -315,7 +315,18 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                         tech_list = json.loads(k["tech_assessment"])
                         if tech_list:
                             st.markdown("<strong>Technical Assessment:</strong>", unsafe_allow_html=True)
-                            st.dataframe(pd.DataFrame(tech_list), use_container_width=True, hide_index=True)
+                            st.dataframe(
+                                pd.DataFrame(tech_list), 
+                                use_container_width=True, 
+                                hide_index=True,
+                                column_config={
+                                    "KPI": st.column_config.TextColumn(width="medium"),
+                                    "Target": st.column_config.TextColumn(width="large"),
+                                    "Weightage (%)": st.column_config.NumberColumn(format="%d%%"),
+                                    "Self-Assessment": st.column_config.TextColumn(width="medium"),
+                                    "Manager Assessment": st.column_config.TextColumn(width="medium")
+                                }
+                            )
                     except:
                         pass
                 
@@ -324,7 +335,18 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                         behav_list = json.loads(k["behavioral_assessment"])
                         if behav_list:
                             st.markdown("<strong>Behavioral Assessment:</strong>", unsafe_allow_html=True)
-                            st.dataframe(pd.DataFrame(behav_list), use_container_width=True, hide_index=True)
+                            st.dataframe(
+                                pd.DataFrame(behav_list), 
+                                use_container_width=True, 
+                                hide_index=True,
+                                column_config={
+                                    "Key Performance Indicators": st.column_config.TextColumn(width="medium"),
+                                    "Target": st.column_config.TextColumn(width="large"),
+                                    "Weight": st.column_config.TextColumn(width="small"),
+                                    "Self-Assessment": st.column_config.NumberColumn(format="%d"),
+                                    "Manager Assessment": st.column_config.TextColumn(width="medium")
+                                }
+                            )
                     except:
                         pass
                 
