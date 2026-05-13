@@ -397,16 +397,22 @@ def email_resolved(t):
 <p style="color:#8b949e;font-size:0.8rem;text-align:center;">MPDR Information Management System · Morepen Proprietary Drug Research Pvt. Ltd.</p></div>"""
     send_email([t['created_by']], subj, html, cc=CC_EMAILS)
 
-@st.cache_data(ttl=60, show_spinner=False)
 def all_users():
     try:
         ws = get_or_create_sheet("users", ["email", "password", "role", "department", "created_at"])
         return safe_get_all_records(ws)
-    except: return []
+    except Exception as e:
+        print(f"Error in all_users: {e}")
+        return []
 
 def get_user(e):
+    if not e: return None
     users = all_users()
-    return next((u for u in users if str(u.get("email")).lower() == str(e).lower()), None)
+    e_low = str(e).strip().lower()
+    for u in users:
+        if str(u.get("email", "")).strip().lower() == e_low:
+            return u
+    return None
 
 def get_authorized_departments(user_email, user_role, registered_department):
     depts = []
@@ -441,8 +447,12 @@ def register_user(email, password, role, department=""):
 def check_pw(pw, h):
     try: 
         if not pw or not h: return False
-        return bcrypt.checkpw(pw.encode(), h.encode())
-    except: return False
+        # Strip any accidental whitespace from the stored hash
+        clean_h = str(h).strip()
+        return bcrypt.checkpw(pw.encode(), clean_h.encode())
+    except Exception as e:
+        print(f"Bcrypt error: {e}")
+        return False
 
 def update_user_password(email, new_password):
     try:
