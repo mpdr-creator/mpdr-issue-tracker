@@ -432,14 +432,16 @@ def get_authorized_departments(user_email, user_role, registered_department):
                 depts.append(rd)
     return depts
 
-def register_user(email, password, role, dept=""):
+def register_user(email, password, role, department=""):
     h = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-    ws = sheet("users")
-    ws.append_row([email.lower(), h, role, dept, now_ist().strftime("%Y-%m-%d %H:%M:%S")])
-    all_users.clear()
+    ws = get_or_create_sheet("users", ["email", "password", "role", "department", "created_at"])
+    ws.append_row([email.lower(), h, role, department, now_ist().strftime("%Y-%m-%d %H:%M:%S")])
+    st.cache_data.clear()
 
 def check_pw(pw, h):
-    try: return bcrypt.checkpw(pw.encode(), h.encode())
+    try: 
+        if not pw or not h: return False
+        return bcrypt.checkpw(pw.encode(), h.encode())
     except: return False
 
 def update_user_password(email, new_password):
