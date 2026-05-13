@@ -400,7 +400,7 @@ def email_resolved(t):
 @st.cache_data(ttl=60, show_spinner=False)
 def all_users():
     try:
-        ws = sheet("users")
+        ws = get_or_create_sheet("users", ["email", "password", "role", "department", "created_at"])
         return safe_get_all_records(ws)
     except: return []
 
@@ -731,11 +731,11 @@ def login_page():
                     st.error("⛔ Only @morepenpdr.com emails are allowed.")
                 else:
                     u=get_user(email)
-                    if u and check_pw(pwd,str(u["password"])):
+                    if u and check_pw(pwd,str(u.get("password", ""))):
                         st.session_state.logged_in=True; st.session_state.email=email
-                        st.session_state.role=u["role"]; st.session_state.dept=u["department"]
+                        st.session_state.role=u.get("role", ""); st.session_state.dept=u.get("department", "")
                         
-                        st.session_state.depts = get_authorized_departments(email, u.get("role", ""), u.get("department", ""))
+                        st.session_state.depts = get_authorized_departments(email, st.session_state.role, st.session_state.dept)
                         
                         st.session_state.app_mode="hub"; st.session_state.page="hub"; st.rerun()
                     else: st.error("Invalid email or password.")
