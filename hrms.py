@@ -193,21 +193,21 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
     tab1, tab2 = st.tabs(["Submit New KRA", "My Previous KRAs"])
     
     with tab1:
-        with st.form("kra_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                year = st.selectbox("Year", ["2024", "2025", "2026", "2027"])
-            with col2:
-                quarter = st.selectbox("Quarter / Cycle", ["Q1", "Q2", "Q3", "Q4", "Half-Yearly", "Annual"])
+        col1, col2 = st.columns(2)
+        with col1:
+            year = st.selectbox("Year", ["2024", "2025", "2026", "2027"])
+        with col2:
+            quarter = st.selectbox("Quarter / Cycle", ["Q1", "Q2", "Q3", "Q4", "Half-Yearly", "Annual"])
 
-            can_submit = True
-            existing_kra = next((k for k in kras if str(k["year"]) == str(year) and str(k["quarter"]) == str(quarter)), None)
-            
-            if existing_kra:
-                st.warning(f"⚠️ You have already submitted a KRA for **{year} {quarter}**. You cannot submit another one for the same period.")
-                st.info("If you need to make changes, please delete your existing entry from the 'My Previous KRAs' tab first.")
-                can_submit = False
-            
+        can_submit = True
+        existing_kra = next((k for k in kras if str(k["year"]) == str(year) and str(k["quarter"]) == str(quarter)), None)
+        
+        if existing_kra:
+            st.warning(f"⚠️ You have already submitted a KRA for **{year} {quarter}**. You cannot submit another one for the same period.")
+            st.info("If you need to make changes, please delete your existing entry from the 'My Previous KRAs' tab first.")
+            can_submit = False
+        
+        with st.form("kra_form"):
             st.markdown("---")
             st.markdown("#### Technical Assessment")
             st.info("💡 You can add/edit rows in the table below. Fill your KPI, Target, Weightage, and Self-Assessment.")
