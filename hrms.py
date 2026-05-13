@@ -448,28 +448,52 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                             behav_list = []
                         
                         if not behav_list:
-                            # Fallback template for legacy KRAs
+                            # Fallback template for legacy KRAs with full target text
                             behav_list = [
-                                {"Key Performance Indicators": "Professional Communication", "Target": "...", "Weight": "5%", "Self-Assessment": "N/A", "Manager Assess": ""},
-                                {"Key Performance Indicators": "Ownership & Accountability", "Target": "...", "Weight": "5%", "Self-Assessment": "N/A", "Manager Assess": ""},
-                                {"Key Performance Indicators": "Team Collaboration & Adaptability", "Target": "...", "Weight": "5%", "Self-Assessment": "N/A", "Manager Assess": ""},
-                                {"Key Performance Indicators": "Professional Conduct & Learning Attitude", "Target": "...", "Weight": "5%", "Self-Assessment": "N/A", "Manager Assess": ""}
+                                {
+                                    "Key Performance Indicators": "Professional Communication", 
+                                    "Target": "• Share precise and well-structured updates in meetings and through written communication.\n• Ensure stakeholders are informed in advance about progress, risks, and concerns.", 
+                                    "Weight": "5%", 
+                                    "Self-Assessment": "N/A (Old KRA)", 
+                                    "Manager Assess": ""
+                                },
+                                {
+                                    "Key Performance Indicators": "Ownership & Accountability", 
+                                    "Target": "• Assume complete responsibility for assigned deliverables and honor committed timelines.\n• Identify potential risks early and communicate corrective actions proactively.", 
+                                    "Weight": "5%", 
+                                    "Self-Assessment": "N/A (Old KRA)", 
+                                    "Manager Assess": ""
+                                },
+                                {
+                                    "Key Performance Indicators": "Team Collaboration & Adaptability", 
+                                    "Target": "• Collaborate constructively with team members and other functions to achieve common goals.\n• Respond positively to priority changes while maintaining delivery standards.", 
+                                    "Weight": "5%", 
+                                    "Self-Assessment": "N/A (Old KRA)", 
+                                    "Manager Assess": ""
+                                },
+                                {
+                                    "Key Performance Indicators": "Professional Conduct & Learning Attitude", 
+                                    "Target": "• Consistently follow organizational guidelines, maintain discipline, and demonstrate professional behavior.\n• Enhance skills regularly and reflect the learning in day-to-day work.", 
+                                    "Weight": "5%", 
+                                    "Self-Assessment": "N/A (Old KRA)", 
+                                    "Manager Assess": ""
+                                }
                             ]
 
                         # Custom Header for Manager Assessment
-                        h1, h2, h3, h4, h5 = st.columns([2, 3, 1, 3, 3])
+                        h1, h2, h3, h4, h5 = st.columns([2, 3, 0.8, 3, 3])
                         h1.markdown("**KPI**")
                         h2.markdown("**Target**")
                         h3.markdown("**Weight**")
                         h4.markdown("**Self-Assessment**")
                         h5.markdown("**Manager Assess**")
-                        st.markdown("<hr style='margin:0.5rem 0; border-top: 1px solid #ddd;'>", unsafe_allow_html=True)
+                        st.markdown("<hr style='margin:0.5rem 0; border-top: 2px solid #0d2d5e;'>", unsafe_allow_html=True)
 
                         edited_behav_list = []
                         for i, item in enumerate(behav_list):
-                            c1, c2, c3, c4, c5 = st.columns([2, 3, 1, 3, 3])
+                            c1, c2, c3, c4, c5 = st.columns([2, 3, 0.8, 3, 3])
                             c1.markdown(f"**{item['Key Performance Indicators']}**")
-                            c2.markdown(item['Target'])
+                            c2.markdown(f"<div style='font-size:0.9rem;'>{item['Target']}</div>", unsafe_allow_html=True)
                             c3.write(item['Weight'])
                             c4.info(item.get('Self-Assessment', 'N/A'))
                             
@@ -477,11 +501,12 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                                 f"Manager Assess for {item['Key Performance Indicators']}",
                                 value=item.get('Manager Assess', ''),
                                 key=f"behav_mgr_{k['kra_id']}_{i}",
-                                height=100,
+                                height=120,
                                 label_visibility="collapsed"
                             )
                             
                             edited_behav_list.append({**item, "Manager Assess": mgr_val})
+                            st.markdown("<hr style='margin:0.3rem 0; border-top: 1px solid #eee;'>", unsafe_allow_html=True)
                         
                         behav_data = edited_behav_list
                         
