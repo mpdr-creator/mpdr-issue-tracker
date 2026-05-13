@@ -174,16 +174,16 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
             with col2:
                 quarter = st.selectbox("Quarter / Cycle", ["Q1", "Q2", "Q3", "Q4", "Half-Yearly", "Annual"])
 
-            # Check for existing submission
+            can_submit = True
             existing_kra = next((k for k in kras if str(k["year"]) == str(year) and str(k["quarter"]) == str(quarter)), None)
             
             if existing_kra:
                 st.warning(f"⚠️ You have already submitted a KRA for **{year} {quarter}**. You cannot submit another one for the same period.")
                 st.info("If you need to make changes, please delete your existing entry from the 'My Previous KRAs' tab first.")
-                st.form_submit_button("Submit KRA for Assessment", type="primary", disabled=True)
-            else:
-                st.markdown("---")
-                st.markdown("#### Technical Assessment")
+                can_submit = False
+            
+            st.markdown("---")
+            st.markdown("#### Technical Assessment")
             st.info("💡 You can add/edit rows in the table below. Fill your KPI, Target, Weightage, and Self-Assessment.")
             
             df_init = pd.DataFrame([
@@ -194,6 +194,7 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                 num_rows="dynamic", 
                 use_container_width=True, 
                 key="tech_eval_editor",
+                disabled=not can_submit,
                 column_config={
                     "Manager Assessment": st.column_config.TextColumn(disabled=True)
                 }
@@ -256,7 +257,8 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                     key=f"behav_self_{i}",
                     height=120,
                     label_visibility="collapsed",
-                    placeholder="Describe your performance..."
+                    placeholder="Describe your performance...",
+                    disabled=not can_submit
                 )
                 behav_inputs[i] = val
                 
@@ -264,7 +266,7 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                 c5.info("Pending manager review")
                 st.markdown("<hr style='margin:0.3rem 0; border-top: 1px solid #eee;'>", unsafe_allow_html=True)
             
-            submitted = st.form_submit_button("Submit KRA for Assessment", type="primary")
+            submitted = st.form_submit_button("Submit KRA for Assessment", type="primary", disabled=not can_submit)
             if submitted:
                 with st.spinner("Submitting KRA..."):
                     # Build behav_data from the inputs captured above
