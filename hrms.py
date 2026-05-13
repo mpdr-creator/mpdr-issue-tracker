@@ -429,7 +429,7 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                                 key=f"tech_edit_{k['kra_id']}",
                                 column_config={
                                     "KPI": st.column_config.TextColumn(disabled=True),
-                                    "SMART Target": st.column_config.TextColumn(disabled=True),
+                                    "Target": st.column_config.TextColumn(disabled=True),
                                     "Weightage (%)": st.column_config.NumberColumn(disabled=True),
                                     "Self-Assessment": st.column_config.TextColumn(disabled=True),
                                     "Manager Assess": st.column_config.TextColumn("Manager Assess", help="Provide your evaluation")
