@@ -170,19 +170,33 @@ def _get_drive_service(get_or_create_sheet):
         return None
 
 def _get_or_create_drive_folder(service, folder_name, parent_id=None):
-    """Get or create a folder in Google Drive."""
+    """Get or create a folder in Google Drive. Checks shared folders too."""
     query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
     if parent_id:
         query += f" and '{parent_id}' in parents"
-    results = service.files().list(q=query, fields="files(id, name)").execute()
+    
+    # Search including shared folders (supportsAllDrives=True)
+    results = service.files().list(
+        q=query, 
+        fields="files(id, name)", 
+        supportsAllDrives=True, 
+        includeItemsFromAllDrives=True
+    ).execute()
+    
     files = results.get('files', [])
     if files:
         return files[0]['id']
-    # Create folder
+    
+    # Create folder (only if not found in shared)
     metadata = {'name': folder_name, 'mimeType': 'application/vnd.google-apps.folder'}
     if parent_id:
         metadata['parents'] = [parent_id]
-    folder = service.files().create(body=metadata, fields='id').execute()
+    
+    folder = service.files().create(
+        body=metadata, 
+        fields='id',
+        supportsAllDrives=True
+    ).execute()
     return folder['id']
 
 def upload_document(email, doc_type, uploaded_file, get_or_create_sheet, safe_get_all_records, now_ist):
@@ -204,12 +218,19 @@ def upload_document(email, doc_type, uploaded_file, get_or_create_sheet, safe_ge
         safe_name = f"{doc_type}_{uploaded_file.name}"
         media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype=uploaded_file.type, resumable=True)
         file_metadata = {'name': safe_name, 'parents': [emp_folder_id]}
-        drive_file = service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+        
+        drive_file = service.files().create(
+            body=file_metadata, 
+            media_body=media, 
+            fields='id, webViewLink',
+            supportsAllDrives=True
+        ).execute()
         
         # Make file viewable by anyone with link
         service.permissions().create(
             fileId=drive_file['id'],
-            body={'type': 'anyone', 'role': 'reader'}
+            body={'type': 'anyone', 'role': 'reader'},
+            supportsAllDrives=True
         ).execute()
         
         # Get the web view link
