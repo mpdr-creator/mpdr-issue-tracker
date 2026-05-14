@@ -512,8 +512,15 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                 st.info("👉 **Click a cell (Pending/Done) to open that specific KRA for assessment.**")
                 
                 # Use st.dataframe with selection
+                styler = grid_df[cols_to_show].style
+                # Use .map for newer pandas, fallback to .applymap for older
+                if hasattr(styler, "map"):
+                    styler = styler.map(style_grid, subset=cycles)
+                else:
+                    styler = styler.applymap(style_grid, subset=cycles)
+
                 event = st.dataframe(
-                    grid_df[cols_to_show].style.applymap(style_grid, subset=cycles),
+                    styler,
                     use_container_width=True,
                     hide_index=True,
                     on_select="rerun",
