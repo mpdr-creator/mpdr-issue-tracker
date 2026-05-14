@@ -464,6 +464,21 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
     except:
         curr_year_idx = 1
 
+    # Custom CSS for Colored Buttons in the Grid
+    st.markdown("""
+        <style>
+        /* Target buttons by their text content */
+        div[data-testid="stButton"] button p:contains("Pending") { color: black !important; font-weight: bold; }
+        div[data-testid="stButton"] button:has(p:contains("Pending")) { background-color: #ffc000 !important; border: 1px solid #cc9900 !important; }
+        
+        div[data-testid="stButton"] button p:contains("Done") { color: black !important; font-weight: bold; }
+        div[data-testid="stButton"] button:has(p:contains("Done")) { background-color: #92d050 !important; border: 1px solid #76a741 !important; }
+        
+        div[data-testid="stButton"] button p:contains("N/A") { color: white !important; }
+        div[data-testid="stButton"] button:has(p:contains("N/A")) { background-color: #ff0000 !important; border: 1px solid #cc0000 !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
     if is_management:
         st.markdown("### 🏢 Departmental Management")
         col_m1, col_m2 = st.columns([2, 1])
@@ -518,24 +533,34 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                         btn_key = f"grid_btn_{row['Email']}_{cycle}_{view_year}"
                         
                         if status == "Pending":
-                            # Use Primary button for Pending (Amber-ish in many themes)
-                            if r_cols[i+1].button("Pending", key=btn_key, use_container_width=True, type="primary"):
+                            if r_cols[i+1].button("Pending", key=btn_key, use_container_width=True):
                                 st.session_state["target_email"] = row["Email"]
                                 st.session_state["target_year"] = view_year
                                 st.session_state["target_quarter"] = cycle
                                 st.rerun()
                         elif status == "Done":
-                            # Use Secondary button for Done
                             if r_cols[i+1].button("Done", key=btn_key, use_container_width=True):
                                 st.session_state["target_email"] = row["Email"]
                                 st.session_state["target_year"] = view_year
                                 st.session_state["target_quarter"] = cycle
                                 st.rerun()
                         else:
-                            # N/A is just text or disabled button
                             r_cols[i+1].button("N/A", key=btn_key, use_container_width=True, disabled=True)
                 
                 st.markdown("---")
+                
+                # Hide the assessment section if no selection is made
+                if "target_email" not in st.session_state or not st.session_state["target_email"]:
+                    st.info("💡 **Select an employee's status in the grid above to start the assessment.**")
+                    return # Exit early so tabs don't show
+                else:
+                    col_sel1, col_sel2 = st.columns([3, 1])
+                    with col_sel1:
+                        st.success(f"🎯 **Active Selection:** {prof_map.get(st.session_state['target_email'], {}).get('full_name', st.session_state['target_email'])} - {st.session_state['target_quarter']} ({st.session_state['target_year']})")
+                    with col_sel2:
+                        if st.button("❌ Clear Selection", use_container_width=True):
+                            del st.session_state["target_email"]
+                            st.rerun()
             
             # Filter the global lists for the tabs below
             dept_emails = [p["email"] for p in dept_profiles]
