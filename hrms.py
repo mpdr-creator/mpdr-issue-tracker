@@ -1,7 +1,6 @@
 import uuid
 import json
 import pandas as pd
-import streamlit as st
 
 # HRMS Constants
 DEPARTMENTS = ["Admin", "CADD", "MedChem", "API", "AR&D", "CDMO", "SSD"]
@@ -131,7 +130,6 @@ def submit_kra(email, year, quarter, objectives, achievements, challenges, tech_
     tech_json = json.dumps(tech_assessment)
     behav_json = json.dumps(behavioral_assessment)
     ws.append_row([kra_id, email, year, quarter, objectives, achievements, challenges, tech_json, "SUBMITTED", now, "", "", "", behav_json])
-    st.cache_data.clear()
 
 def assess_kra(kra_id, notes, rating, tech_assessment, behavioral_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
     ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
@@ -142,7 +140,6 @@ def assess_kra(kra_id, notes, rating, tech_assessment, behavioral_assessment, ge
     for i, r in enumerate(recs, start=2):
         if str(r.get("kra_id", "")) == kra_id:
             ws.update(f"H{i}:N{i}", [[tech_json, "ASSESSED", r["submitted_at"], now, notes, rating, behav_json]])
-            st.cache_data.clear()
             return
 
 def delete_kra(kra_id, get_or_create_sheet, safe_get_all_records):
@@ -151,7 +148,6 @@ def delete_kra(kra_id, get_or_create_sheet, safe_get_all_records):
     for i, r in enumerate(recs, start=2):
         if str(r.get("kra_id", "")) == kra_id:
             ws.delete_rows(i)
-            st.cache_data.clear()
             return
 
 # UI Rendering functions
