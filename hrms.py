@@ -170,33 +170,29 @@ def _get_drive_service(get_or_create_sheet):
         return None
 
 def _get_or_create_drive_folder(service, folder_name, parent_id=None):
-    """Get or create a folder in Google Drive. Checks shared folders too."""
-    query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-    if parent_id:
-        query += f" and '{parent_id}' in parents"
+    """Get or create a folder. Defaults to the user's shared root if no parent."""
+    # Hardcoded root folder ID shared by mpdr.services@gmail.com
+    SHARED_ROOT_ID = "1a0B1MA-tKegDAIz25D0Z5YpPzAucRMZf"
     
-    # Search including shared folders (supportsAllDrives=True)
-    results = service.files().list(
-        q=query, 
-        fields="files(id, name)", 
-        supportsAllDrives=True, 
-        includeItemsFromAllDrives=True
-    ).execute()
+    if folder_name == "HRMS_Documents" and not parent_id:
+        return SHARED_ROOT_ID
+        
+    actual_parent = parent_id if parent_id else SHARED_ROOT_ID
     
+    query = f"name='{folder_name}' and '{actual_parent}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+    results = service.files().list(q=query, fields="files(id, name)", supportsAllDrives=True).execute()
     files = results.get('files', [])
+    
     if files:
         return files[0]['id']
     
-    # Create folder (only if not found in shared)
-    metadata = {'name': folder_name, 'mimeType': 'application/vnd.google-apps.folder'}
-    if parent_id:
-        metadata['parents'] = [parent_id]
-    
-    folder = service.files().create(
-        body=metadata, 
-        fields='id',
-        supportsAllDrives=True
-    ).execute()
+    # Create subfolder inside the shared root
+    metadata = {
+        'name': folder_name, 
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [actual_parent]
+    }
+    folder = service.files().create(body=metadata, fields='id', supportsAllDrives=True).execute()
     return folder['id']
 
 def upload_document(email, doc_type, uploaded_file, get_or_create_sheet, safe_get_all_records, now_ist):
