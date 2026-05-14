@@ -2,6 +2,9 @@ import uuid
 import json
 import pandas as pd
 
+# HRMS Constants
+DEPARTMENTS = ["Admin", "CADD", "MedChem", "API", "AR&D", "CDMO", "SSD"]
+
 # HRMS Database schema operations
 def all_hrms_profiles(get_or_create_sheet, safe_get_all_records):
     try:
@@ -90,6 +93,36 @@ def render_kra_table(st, data_list, headers):
     </div>
     """, unsafe_allow_html=True)
 
+def render_status_grid(st, rows, cycles):
+    # CSS for the status grid
+    st.markdown("""
+    <style>
+    .kra-summary-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-family: 'Inter', sans-serif; border-radius: 8px; overflow: hidden; }
+    .kra-summary-table th { background: #f1f5f9; color: #0d2d5e; padding: 12px; border: 1px solid #cbd5e1; font-weight: bold; text-align: center; }
+    .kra-summary-table td { border: 1px solid #cbd5e1; padding: 0; text-align: center; font-size: 0.9rem; }
+    .emp-name-cell { background: #1f4e78; color: white !important; font-weight: bold; padding: 10px !important; text-align: left !important; min-width: 150px; }
+    .status-cell { font-weight: bold; width: 120px; }
+    .status-done { background-color: #92d050; color: black; } 
+    .status-pending { background-color: #ffc000; color: black; }
+    .status-na { background-color: #ff0000; color: white; }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    header = "<tr><th>Employee</th>" + "".join([f"<th>{c}</th>" for c in cycles]) + "</tr>"
+    
+    body = ""
+    for row in rows:
+        cells = f'<td class="emp-name-cell">{row["Employee"]}</td>'
+        for c in cycles:
+            status = row[c]
+            cls = "status-na"
+            if status == "Done": cls = "status-done"
+            elif status == "Pending": cls = "status-pending"
+            cells += f'<td class="status-cell {cls}">{status}</td>'
+        body += f"<tr>{cells}</tr>"
+        
+    st.markdown(f'<div style="overflow-x:auto;"><table class="kra-summary-table"><thead>{header}</thead><tbody>{body}</tbody></table></div>', unsafe_allow_html=True)
+
 def submit_kra(email, year, quarter, objectives, achievements, challenges, tech_assessment, behavioral_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
     ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
     kra_id = str(uuid.uuid4())[:8].upper()
@@ -142,8 +175,6 @@ def page_hrms_profile(st, session_state, get_or_create_sheet, safe_get_all_recor
         with col1:
             full_name = st.text_input("Full Name", value=profile.get("full_name", "") if profile else "")
             
-            # Department Dropdown as requested
-            DEPARTMENTS = ["Admin", "CADD", "MedChem", "API", "AR&D", "CDMO", "SSD"]
             current_dept = profile.get("department", session_state.get("dept", "")) if profile else session_state.get("dept", "")
             try:
                 dept_index = DEPARTMENTS.index(current_dept)
@@ -422,7 +453,51 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
     profiles = all_hrms_profiles(get_or_create_sheet, safe_get_all_records)
     prof_map = {p["email"]: p for p in profiles}
 
-    # Split KRAs
+    is_management = session_state.role == "management" or session_state.email == "hr@morepenpdr.com"
+    
+    # 1. Management Filter & Overview
+    if is_management:
+        st.markdown("### 🏢 Departmental Management")
+        col_m1, col_m2 = st.columns([2, 1])
+        with col_m1:
+            selected_dept = st.selectbox("1. Select Department to View", ["All Departments"] + DEPARTMENTS)
+        with col_m2:
+            view_year = st.selectbox("2. Select Assessment Year", ["2024", "2025", "2026", "2027"], index=1)
+            
+        if selected_dept != "All Departments":
+            # Show the Grid for selected department
+            st.markdown(f"#### 📊 {selected_dept} - {view_year} KRA Completion Grid")
+            dept_profiles = [p for p in profiles if p.get("department") == selected_dept]
+            
+            if not dept_profiles:
+                st.info(f"No employee profiles found for {selected_dept}.")
+            else:
+                cycles = ["Q1", "Q2", "Q3", "Q4", "Half-Yearly", "Annual"]
+                grid_rows = []
+                for p in dept_profiles:
+                    email = p["email"]
+                    name = p.get("full_name", email)
+                    row = {"Employee": name}
+                    for cycle in cycles:
+                        # Find KRA for this cycle and year
+                        kra = next((kra for kra in kras if kra["email"] == email and str(kra["year"]) == str(view_year) and kra["quarter"] == cycle), None)
+                        status = "N/A"
+                        if kra:
+                            s = str(kra.get("status", "")).strip().upper()
+                            status = "Done" if s == "ASSESSED" else "Pending"
+                        row[cycle] = status
+                    grid_rows.append(row)
+                
+                render_status_grid(st, grid_rows, cycles)
+                st.markdown("---")
+            
+            # Filter the global lists for the tabs below
+            dept_emails = [p["email"] for p in dept_profiles]
+            kras = [k for k in kras if k["email"] in dept_emails]
+        else:
+            st.info("💡 Select a specific department above to view the KRA completion grid.")
+
+    # Split KRAs for tabs
     pending = [k for k in kras if str(k.get("status", "")).strip().upper() == "SUBMITTED"]
     assessed = [k for k in kras if str(k.get("status", "")).strip().upper() == "ASSESSED"]
     
