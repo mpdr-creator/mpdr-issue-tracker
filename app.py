@@ -280,16 +280,26 @@ ALLOWED_TRANSITIONS = {
 # SLA resolution deadlines (hours) per priority
 SLA_HOURS = {"Critical": 4, "High": 24, "Medium": 72, "Low": 168}
 
+@st.cache_resource(show_spinner=False)
+def _get_spreadsheet():
+    return get_client().open("MPDR Issue Tracker")
+
 def get_or_create_sheet(name, cols):
-    client = get_client().open("MPDR Issue Tracker")
-    if name not in [ws.title for ws in client.worksheets()]:
-        ws = client.add_worksheet(title=name, rows=1000, cols=len(cols))
+    spreadsheet = _get_spreadsheet()
+    try:
+        ws = spreadsheet.worksheet(name)
+    except gspread.exceptions.WorksheetNotFound:
+        ws = spreadsheet.add_worksheet(title=name, rows=1000, cols=len(cols))
         ws.append_row(cols)
-    ws = client.worksheet(name)
-    # Ensure headers match schema exactly
-    existing = ws.row_values(1)
-    if existing != cols:
-        ws.update("A1", [cols])
+        return ws
+    # Only check headers once per sheet per session to avoid API rate limits
+    if "checked_sheets" not in st.session_state:
+        st.session_state["checked_sheets"] = set()
+    if name not in st.session_state["checked_sheets"]:
+        existing = ws.row_values(1)
+        if existing != cols and cols:
+            ws.update("A1", [cols])
+        st.session_state["checked_sheets"].add(name)
     return ws
 
 def log_ticket_history(tid, old_status, new_status, by, notes=""):
