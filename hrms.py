@@ -31,14 +31,17 @@ def all_hrms_profiles(get_or_create_sheet, safe_get_all_records):
             "updated_at": u.get("created_at", "")
         } for u in users}
         
-        # Overlay with actual profile data
+        # Overlay with actual profile data (only non-empty values)
         for p in profiles:
             email = p.get("email")
             if email:
                 if email not in merged:
                     merged[email] = p
                 else:
-                    merged[email].update(p)
+                    # Only overwrite with non-empty values from profile
+                    for key, val in p.items():
+                        if val is not None and str(val).strip() != "":
+                            merged[email][key] = val
                     
         return list(merged.values())
     except Exception as e:
@@ -64,7 +67,7 @@ def update_hrms_profile(email, full_name, designation, department, phone, emerge
 
 def all_hrms_kras(get_or_create_sheet, safe_get_all_records):
     try:
-        ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
+        ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment", "department"])
         return safe_get_all_records(ws)
     except:
         return []
@@ -123,16 +126,16 @@ def render_status_grid(st, rows, cycles):
         
     st.markdown(f'<div style="overflow-x:auto;"><table class="kra-summary-table"><thead>{header}</thead><tbody>{body}</tbody></table></div>', unsafe_allow_html=True)
 
-def submit_kra(email, year, quarter, objectives, achievements, challenges, tech_assessment, behavioral_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
-    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
+def submit_kra(email, year, quarter, objectives, achievements, challenges, tech_assessment, behavioral_assessment, get_or_create_sheet, safe_get_all_records, now_ist, department=""):
+    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment", "department"])
     kra_id = str(uuid.uuid4())[:8].upper()
     now = now_ist().strftime("%Y-%m-%d %H:%M:%S")
     tech_json = json.dumps(tech_assessment)
     behav_json = json.dumps(behavioral_assessment)
-    ws.append_row([kra_id, email, year, quarter, objectives, achievements, challenges, tech_json, "SUBMITTED", now, "", "", "", behav_json])
+    ws.append_row([kra_id, email, year, quarter, objectives, achievements, challenges, tech_json, "SUBMITTED", now, "", "", "", behav_json, department])
 
 def assess_kra(kra_id, notes, rating, tech_assessment, behavioral_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
-    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
+    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment", "department"])
     recs = safe_get_all_records(ws)
     now = now_ist().strftime("%Y-%m-%d %H:%M:%S")
     tech_json = json.dumps(tech_assessment)
@@ -143,7 +146,7 @@ def assess_kra(kra_id, notes, rating, tech_assessment, behavioral_assessment, ge
             return
 
 def delete_kra(kra_id, get_or_create_sheet, safe_get_all_records):
-    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
+    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment", "department"])
     recs = safe_get_all_records(ws)
     for i, r in enumerate(recs, start=2):
         if str(r.get("kra_id", "")) == kra_id:
@@ -219,13 +222,23 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
     email = session_state.email
     kras = [k for k in all_hrms_kras(get_or_create_sheet, safe_get_all_records) if k.get("email") == email]
     
+    # Get user's department from profile
+    profile = get_hrms_profile(email, get_or_create_sheet, safe_get_all_records)
+    user_dept = profile.get("department", "") if profile else ""
+    
     tab1, tab2 = st.tabs(["Submit New KRA", "My Previous KRAs"])
     
     with tab1:
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
-            year = st.selectbox("Year", ["2024", "2025", "2026", "2027"])
+            # Pre-select user's department
+            dept_idx = 0
+            if user_dept in DEPARTMENTS:
+                dept_idx = DEPARTMENTS.index(user_dept)
+            kra_dept = st.selectbox("Department", DEPARTMENTS, index=dept_idx)
         with col2:
+            year = st.selectbox("Year", ["2024", "2025", "2026", "2027"])
+        with col3:
             quarter = st.selectbox("Quarter / Cycle", ["Q1", "Q2", "Q3", "Q4", "Half-Yearly", "Annual"])
 
         can_submit = True
@@ -336,7 +349,7 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                         })
                     
                     tech_data = edited_df.to_dict('records')
-                    submit_kra(email, year, quarter, "", "", "", tech_data, behav_data, get_or_create_sheet, safe_get_all_records, now_ist)
+                    submit_kra(email, year, quarter, "", "", "", tech_data, behav_data, get_or_create_sheet, safe_get_all_records, now_ist, department=kra_dept)
                 st.success("KRA submitted successfully!")
                 st.rerun()
                     
@@ -476,7 +489,12 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
         
         # ─── Department Selected: Show Grid ───
         st.markdown(f"#### 📊 {selected_dept} — {view_year} KRA Status")
-        dept_profiles = [p for p in profiles if p.get("department") == selected_dept]
+        # Get employees from profiles AND from KRA submissions for this department
+        dept_profile_emails = set(p["email"] for p in profiles if p.get("department") == selected_dept)
+        # Also include any employee who submitted a KRA with this department
+        dept_kra_emails = set(k.get("email", "") for k in kras if str(k.get("department", "")).strip() == selected_dept)
+        all_dept_emails = dept_profile_emails | dept_kra_emails
+        dept_profiles = [p for p in profiles if p["email"] in all_dept_emails]
         
         if not dept_profiles:
             st.warning(f"No employee profiles found for **{selected_dept}**.")
@@ -659,7 +677,7 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
             # Delete button outside form
             if st.button("🗑️ Delete this Submission", key=f"btn_del_{sel_kra['kra_id']}", type="secondary"):
                 try:
-                    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
+                    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment", "department"])
                     records = safe_get_all_records(ws)
                     row_idx = -1
                     for i, r in enumerate(records):
