@@ -464,21 +464,6 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
     except:
         curr_year_idx = 1
 
-    # Custom CSS for Colored Buttons in the Grid
-    st.markdown("""
-        <style>
-        /* Target buttons by their text content */
-        div[data-testid="stButton"] button p:contains("Pending") { color: black !important; font-weight: bold; }
-        div[data-testid="stButton"] button:has(p:contains("Pending")) { background-color: #ffc000 !important; border: 1px solid #cc9900 !important; }
-        
-        div[data-testid="stButton"] button p:contains("Done") { color: black !important; font-weight: bold; }
-        div[data-testid="stButton"] button:has(p:contains("Done")) { background-color: #92d050 !important; border: 1px solid #76a741 !important; }
-        
-        div[data-testid="stButton"] button p:contains("N/A") { color: white !important; }
-        div[data-testid="stButton"] button:has(p:contains("N/A")) { background-color: #ff0000 !important; border: 1px solid #cc0000 !important; }
-        </style>
-    """, unsafe_allow_html=True)
-
     if is_management:
         st.markdown("### 🏢 Departmental Management")
         col_m1, col_m2 = st.columns([2, 1])
@@ -497,6 +482,7 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
             else:
                 cycles = ["Q1", "Q2", "Q3", "Q4", "Half-Yearly", "Annual"]
                 grid_rows = []
+                actionable_items = []  # For the selector below
                 for p in dept_profiles:
                     email = p["email"]
                     name = p.get("full_name", email)
@@ -511,56 +497,53 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                             s = str(kra.get("status", "")).strip().upper()
                             status = "Done" if s == "ASSESSED" else "Pending"
                         row[cycle] = status
-                    row["Email"] = email # Hidden but needed for logic
+                        # Collect actionable items
+                        if status in ["Pending", "Done"]:
+                            actionable_items.append({"name": name, "email": email, "cycle": cycle, "status": status})
+                    row["Email"] = email
                     grid_rows.append(row)
                 
-                # Interactive Grid using st.columns and buttons
-                st.info("👉 **Click on a 'Pending' or 'Done' box to open that KRA for assessment.**")
+                # Render the color-coded HTML table
+                render_status_grid(st, grid_rows, cycles)
                 
-                # Header Row
-                h_cols = st.columns([2.5, 1, 1, 1, 1, 1, 1])
-                h_cols[0].markdown("**Employee**")
-                for i, cycle in enumerate(cycles):
-                    h_cols[i+1].markdown(f"**{cycle}**")
-                
-                st.markdown("<hr style='margin:0.2rem 0;'>", unsafe_allow_html=True)
-                
-                for r_idx, row in enumerate(grid_rows):
-                    r_cols = st.columns([2.5, 1, 1, 1, 1, 1, 1])
-                    r_cols[0].write(f"**{row['Employee']}**")
-                    for i, cycle in enumerate(cycles):
-                        status = row[cycle]
-                        btn_key = f"grid_btn_{row['Email']}_{cycle}_{view_year}"
-                        
-                        if status == "Pending":
-                            if r_cols[i+1].button("Pending", key=btn_key, use_container_width=True):
-                                st.session_state["target_email"] = row["Email"]
-                                st.session_state["target_year"] = view_year
-                                st.session_state["target_quarter"] = cycle
-                                st.rerun()
-                        elif status == "Done":
-                            if r_cols[i+1].button("Done", key=btn_key, use_container_width=True):
-                                st.session_state["target_email"] = row["Email"]
-                                st.session_state["target_year"] = view_year
-                                st.session_state["target_quarter"] = cycle
-                                st.rerun()
-                        else:
-                            r_cols[i+1].button("N/A", key=btn_key, use_container_width=True, disabled=True)
-                
-                st.markdown("---")
-                
-                # Hide the assessment section if no selection is made
-                if "target_email" not in st.session_state or not st.session_state["target_email"]:
-                    st.info("💡 **Select an employee's status in the grid above to start the assessment.**")
-                    return # Exit early so tabs don't show
-                else:
-                    col_sel1, col_sel2 = st.columns([3, 1])
-                    with col_sel1:
-                        st.success(f"🎯 **Active Selection:** {prof_map.get(st.session_state['target_email'], {}).get('full_name', st.session_state['target_email'])} - {st.session_state['target_quarter']} ({st.session_state['target_year']})")
-                    with col_sel2:
-                        if st.button("❌ Clear Selection", use_container_width=True):
-                            del st.session_state["target_email"]
+                # Interactive selector below the grid
+                if actionable_items:
+                    st.markdown("#### 🎯 Select from Grid to Open Assessment")
+                    options = [f"{item['name']} → {item['cycle']} ({item['status']})" for item in actionable_items]
+                    
+                    # Pre-select if a target is already set
+                    default_idx = 0
+                    if "target_email" in st.session_state and "target_quarter" in st.session_state:
+                        for idx, item in enumerate(actionable_items):
+                            if item["email"] == st.session_state.get("target_email") and item["cycle"] == st.session_state.get("target_quarter"):
+                                default_idx = idx
+                                break
+                    
+                    selected_action = st.selectbox("Click a status in the table, then select here:", options, index=default_idx, key="grid_action_select")
+                    
+                    col_go, col_clear = st.columns([1, 1])
+                    with col_go:
+                        if st.button("📋 Open Assessment", use_container_width=True, type="primary"):
+                            sel_item = actionable_items[options.index(selected_action)]
+                            st.session_state["target_email"] = sel_item["email"]
+                            st.session_state["target_year"] = view_year
+                            st.session_state["target_quarter"] = sel_item["cycle"]
                             st.rerun()
+                    with col_clear:
+                        if "target_email" in st.session_state:
+                            if st.button("❌ Clear Selection", use_container_width=True):
+                                for key in ["target_email", "target_year", "target_quarter"]:
+                                    st.session_state.pop(key, None)
+                                st.rerun()
+                
+                # Show active selection if one exists
+                if "target_email" in st.session_state and st.session_state.get("target_email"):
+                    st.success(f"🎯 **Active:** {prof_map.get(st.session_state['target_email'], {}).get('full_name', st.session_state['target_email'])} — {st.session_state.get('target_quarter', '')} ({st.session_state.get('target_year', '')})")
+                else:
+                    st.info("💡 **Select an employee's KRA from the dropdown above, then click 'Open Assessment'.**")
+                    return  # Don't show tabs until selection
+                    
+                st.markdown("---")
             
             # Filter the global lists for the tabs below
             dept_emails = [p["email"] for p in dept_profiles]
@@ -795,13 +778,15 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
             k = next((k for k in emp_assessed if str(k["year"]) == str(h_year) and k["quarter"] == h_quarter), None)
             
             if k:
+                h_name = prof_map.get(h_email, {}).get("full_name", h_email)
+                h_dept = prof_map.get(h_email, {}).get("department", "Unknown")
                 st.markdown(f"### 📋 Assessment Record: {h_quarter} {h_year}")
                 # Render history details...
                 
                 st.markdown(f"""
                 <div style="background:white;padding:1.5rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.05);margin-bottom:1rem;border-left:4px solid #3fb950;">
                     <div style="display:flex;justify-content:space-between;margin-bottom:1rem;">
-                        <span style="font-weight:600;color:#0d2d5e;font-size:1.1rem;">{name} ({dept}) - {k['year']} {k['quarter']}</span>
+                        <span style="font-weight:600;color:#0d2d5e;font-size:1.1rem;">{h_name} ({h_dept}) - {k['year']} {k['quarter']}</span>
                         <span style="color:#3fb950;font-weight:bold;">Rating: {k['rating']}/5</span>
                     </div>
                     <div style="margin-bottom:0.8rem;"><strong>Assessment Notes:</strong><br>{k['assessment_notes']}</div>
