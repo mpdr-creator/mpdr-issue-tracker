@@ -1,11 +1,9 @@
 import uuid
 import json
 import pandas as pd
-import io
 
 # HRMS Constants
 DEPARTMENTS = ["Admin", "CADD", "MedChem", "API", "AR&D", "CDMO", "SSD"]
-DOC_TYPES = ["Aadhar Card", "PAN Card", "Address Proof", "Resume / CV", "Offer Letter", "Educational Certificate", "Photo ID", "Other"]
 
 # HRMS Database schema operations
 def all_hrms_profiles(get_or_create_sheet, safe_get_all_records):
@@ -155,128 +153,6 @@ def delete_kra(kra_id, get_or_create_sheet, safe_get_all_records):
             ws.delete_rows(i)
             return
 
-# ─── Drive Document Upload Helpers ───
-def _get_drive_service(get_or_create_sheet):
-    """Get Google Drive service using the existing gspread credentials."""
-    try:
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaIoBaseUpload
-        # Access the gspread client's auth credentials
-        spreadsheet = get_or_create_sheet("hrms_documents", ["doc_id", "email", "doc_type", "file_name", "drive_file_id", "drive_link", "uploaded_at"])
-        creds = spreadsheet.client.auth
-        service = build('drive', 'v3', credentials=creds)
-        return service
-    except Exception as e:
-        return None
-
-def _get_or_create_drive_folder(service, folder_name, parent_id=None):
-    """Get or create a folder. Defaults to the user's shared root if no parent."""
-    # Hardcoded root folder ID shared by mpdr.services@gmail.com
-    SHARED_ROOT_ID = "1a0B1MA-tKegDAIz25D0Z5YpPzAucRMZf"
-    
-    if folder_name == "HRMS_Documents" and not parent_id:
-        return SHARED_ROOT_ID
-        
-    actual_parent = parent_id if parent_id else SHARED_ROOT_ID
-    
-    query = f"name='{folder_name}' and '{actual_parent}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
-    results = service.files().list(q=query, fields="files(id, name)", supportsAllDrives=True).execute()
-    files = results.get('files', [])
-    
-    if files:
-        return files[0]['id']
-    
-    # Create subfolder inside the shared root
-    metadata = {
-        'name': folder_name, 
-        'mimeType': 'application/vnd.google-apps.folder',
-        'parents': [actual_parent]
-    }
-    folder = service.files().create(body=metadata, fields='id', supportsAllDrives=True).execute()
-    return folder['id']
-
-def upload_document(email, doc_type, uploaded_file, get_or_create_sheet, safe_get_all_records, now_ist):
-    """Upload a document to Google Drive and record metadata."""
-    try:
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaIoBaseUpload
-        
-        ws = get_or_create_sheet("hrms_documents", ["doc_id", "email", "doc_type", "file_name", "drive_file_id", "drive_link", "uploaded_at"])
-        creds = ws.client.auth
-        service = build('drive', 'v3', credentials=creds)
-        
-        # Create folder structure: HRMS_Documents / employee_email /
-        root_folder_id = _get_or_create_drive_folder(service, "HRMS_Documents")
-        emp_folder_id = _get_or_create_drive_folder(service, email.replace('@', '_at_'), root_folder_id)
-        
-        # Upload file
-        file_bytes = uploaded_file.getvalue()
-        safe_name = f"{doc_type}_{uploaded_file.name}"
-        media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype=uploaded_file.type, resumable=True)
-        file_metadata = {'name': safe_name, 'parents': [emp_folder_id]}
-        
-        drive_file = service.files().create(
-            body=file_metadata, 
-            media_body=media, 
-            fields='id, webViewLink',
-            supportsAllDrives=True
-        ).execute()
-        
-        # Make file viewable by anyone with link
-        service.permissions().create(
-            fileId=drive_file['id'],
-            body={'type': 'anyone', 'role': 'reader'},
-            supportsAllDrives=True
-        ).execute()
-        
-        # Get the web view link
-        file_info = service.files().get(fileId=drive_file['id'], fields='webViewLink').execute()
-        view_link = file_info.get('webViewLink', '')
-        
-        # Record in sheet
-        doc_id = str(uuid.uuid4())[:8].upper()
-        now = now_ist().strftime("%Y-%m-%d %H:%M:%S")
-        ws.append_row([doc_id, email, doc_type, uploaded_file.name, drive_file['id'], view_link, now])
-        
-        return True, view_link
-    except Exception as e:
-        return False, str(e)
-
-def get_employee_documents(email, get_or_create_sheet, safe_get_all_records):
-    """Get all documents uploaded by an employee."""
-    try:
-        ws = get_or_create_sheet("hrms_documents", ["doc_id", "email", "doc_type", "file_name", "drive_file_id", "drive_link", "uploaded_at"])
-        docs = safe_get_all_records(ws)
-        return [d for d in docs if d.get("email", "").strip().lower() == email.strip().lower()]
-    except:
-        return []
-
-def delete_document(doc_id, get_or_create_sheet, safe_get_all_records):
-    """Delete a document from Drive and the sheet."""
-    try:
-        from googleapiclient.discovery import build
-        
-        ws = get_or_create_sheet("hrms_documents", ["doc_id", "email", "doc_type", "file_name", "drive_file_id", "drive_link", "uploaded_at"])
-        creds = ws.client.auth
-        service = build('drive', 'v3', credentials=creds)
-        recs = safe_get_all_records(ws)
-        
-        for i, r in enumerate(recs, start=2):
-            if str(r.get("doc_id", "")) == str(doc_id):
-                # Delete from Drive
-                drive_file_id = r.get("drive_file_id", "")
-                if drive_file_id:
-                    try:
-                        service.files().delete(fileId=drive_file_id).execute()
-                    except:
-                        pass  # File may already be deleted
-                # Delete row from sheet
-                ws.delete_rows(i)
-                return True
-        return False
-    except:
-        return False
-
 # UI Rendering functions
 def page_hrms_profile(st, session_state, get_or_create_sheet, safe_get_all_records, now_ist):
     st.markdown("""
@@ -334,60 +210,6 @@ def page_hrms_profile(st, session_state, get_or_create_sheet, safe_get_all_recor
                     update_hrms_profile(email, full_name, designation, department, phone, emergency_contact, present_address, permanent_address, transport_required, health_issues, get_or_create_sheet, safe_get_all_records, now_ist)
                 st.success("Profile saved successfully!")
                 st.rerun()
-    
-    # ─── Document Upload Section ───
-    st.markdown("---")
-    st.markdown("### 📄 Verification Documents")
-    st.caption("Upload your identity & verification documents. Accepted formats: PDF, JPG, PNG (max 10MB each)")
-    
-    col_up1, col_up2 = st.columns([1, 2])
-    with col_up1:
-        doc_type = st.selectbox("Document Type", DOC_TYPES, key="doc_type_sel")
-    with col_up2:
-        uploaded_file = st.file_uploader(
-            "Choose file",
-            type=["pdf", "jpg", "jpeg", "png", "doc", "docx"],
-            key="doc_uploader",
-            help="Max file size: 10MB"
-        )
-    
-    if uploaded_file:
-        # Check file size (10MB limit)
-        if uploaded_file.size > 10 * 1024 * 1024:
-            st.error("❌ File too large. Maximum size is 10MB.")
-        else:
-            if st.button("📤 Upload Document", type="primary", key="btn_upload_doc"):
-                with st.spinner(f"Uploading {uploaded_file.name} to Drive..."):
-                    success, result = upload_document(email, doc_type, uploaded_file, get_or_create_sheet, safe_get_all_records, now_ist)
-                if success:
-                    st.success(f"✅ **{doc_type}** uploaded successfully!")
-                    st.rerun()
-                else:
-                    st.error(f"❌ Upload failed: {result}")
-    
-    # Show existing documents
-    docs = get_employee_documents(email, get_or_create_sheet, safe_get_all_records)
-    if docs:
-        st.markdown("#### Uploaded Documents")
-        for doc in docs:
-            col_d1, col_d2, col_d3, col_d4 = st.columns([2, 2, 1.5, 0.8])
-            with col_d1:
-                st.markdown(f"📎 **{doc.get('doc_type', 'Document')}**")
-            with col_d2:
-                st.caption(f"{doc.get('file_name', 'Unknown')}")
-            with col_d3:
-                link = doc.get('drive_link', '')
-                if link:
-                    st.markdown(f"[🔗 View / Download]({link})")
-            with col_d4:
-                if st.button("🗑️", key=f"del_doc_{doc.get('doc_id', '')}", help="Delete this document"):
-                    if delete_document(doc['doc_id'], get_or_create_sheet, safe_get_all_records):
-                        st.success("Document deleted.")
-                        st.rerun()
-                    else:
-                        st.error("Failed to delete.")
-    else:
-        st.info("📂 No documents uploaded yet. Upload your verification documents above.")
 
 def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, now_ist):
     st.markdown("""
