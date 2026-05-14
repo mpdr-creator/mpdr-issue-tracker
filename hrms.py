@@ -456,13 +456,21 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
     is_management = session_state.role == "management" or session_state.email == "hr@morepenpdr.com"
     
     # 1. Management Filter & Overview
+    import datetime
+    curr_year = str(datetime.datetime.now().year)
+    year_options = ["2024", "2025", "2026", "2027"]
+    try:
+        curr_year_idx = year_options.index(curr_year)
+    except:
+        curr_year_idx = 1
+
     if is_management:
         st.markdown("### 🏢 Departmental Management")
         col_m1, col_m2 = st.columns([2, 1])
         with col_m1:
             selected_dept = st.selectbox("1. Select Department to View", ["All Departments"] + DEPARTMENTS)
         with col_m2:
-            view_year = st.selectbox("2. Select Assessment Year", ["2024", "2025", "2026", "2027"], index=1)
+            view_year = st.selectbox("2. Select Assessment Year", year_options, index=curr_year_idx)
             
         if selected_dept != "All Departments":
             # Show the Grid for selected department
@@ -479,8 +487,10 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                     name = p.get("full_name", email)
                     row = {"Employee": name}
                     for cycle in cycles:
-                        # Find KRA for this cycle and year
-                        kra = next((kra for kra in kras if kra["email"] == email and str(kra["year"]) == str(view_year) and kra["quarter"] == cycle), None)
+                        # Find KRA for this cycle and year (Robust matching)
+                        kra = next((k for k in kras if str(k.get("email", "")).strip().lower() == email.strip().lower() 
+                                    and str(k.get("year", "")).strip() == str(view_year).strip() 
+                                    and str(k.get("quarter", "")).strip() == cycle.strip()), None)
                         status = "N/A"
                         if kra:
                             s = str(kra.get("status", "")).strip().upper()
@@ -489,6 +499,17 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                     grid_rows.append(row)
                 
                 render_status_grid(st, grid_rows, cycles)
+                
+                # Jump to Assessment Feature
+                st.markdown("---")
+                st.markdown("#### 🎯 Quick Assessment Selector")
+                emp_list = [f"{p.get('full_name', p['email'])} | {p['email']}" for p in dept_profiles]
+                selected_for_jump = st.selectbox("Select Employee from the table above to start assessment:", ["-- Choose --"] + emp_list)
+                if selected_for_jump != "-- Choose --":
+                    jump_email = selected_for_jump.split(" | ")[1]
+                    st.session_state["target_email"] = jump_email
+                    st.info(f"✅ {selected_for_jump.split(' | ')[0]} selected. Scroll down to the 'Pending Assessment' tab.")
+                
                 st.markdown("---")
             
             # Filter the global lists for the tabs below
@@ -516,7 +537,15 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                 dept = p.get("department", "Unknown")
                 return f"{name} ({dept})"
 
-            selected_email = st.selectbox("1. Select Employee", pending_emails, format_func=get_emp_label)
+            # Default to target_email if jump feature used
+            default_idx = 0
+            if "target_email" in st.session_state and st.session_state["target_email"] in pending_emails:
+                try:
+                    default_idx = pending_emails.index(st.session_state["target_email"])
+                except:
+                    pass
+
+            selected_email = st.selectbox("1. Select Employee", pending_emails, index=default_idx, format_func=get_emp_label)
             
             if selected_email:
                 # 2. Select Year and Quarter for this employee
@@ -576,35 +605,35 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                             behav_list = []
                         
                         if not behav_list:
-                            # Fallback template for legacy KRAs with full target text
+                            # Fallback template for legacy KRAs or if not provided
                             behav_list = [
                                 {
                                     "Key Performance Indicators": "Professional Communication", 
                                     "Target": "• Share precise and well-structured updates in meetings and through written communication.\n• Ensure stakeholders are informed in advance about progress, risks, and concerns.", 
                                     "Weight": "5%", 
-                                    "Self-Assessment": "N/A", 
+                                    "Self-Assessment": "Not Provided", 
                                     "Manager Assessment": ""
                                 },
                                 {
                                     "Key Performance Indicators": "Ownership & Accountability", 
                                     "Target": "• Assume complete responsibility for assigned deliverables and honor committed timelines.\n• Identify potential risks early and communicate corrective actions proactively.", 
                                     "Weight": "5%", 
-                                    "Self-Assessment": "N/A", 
+                                    "Self-Assessment": "Not Provided", 
                                     "Manager Assessment": ""
                                 },
                                 {
                                     "Key Performance Indicators": "Team Collaboration & Adaptability", 
                                     "Target": "• Collaborate constructively with team members and other functions to achieve common goals.\n• Respond positively to priority changes while maintaining delivery standards.", 
                                     "Weight": "5%", 
-                                    "Self-Assessment": "N/A", 
+                                    "Self-Assessment": "Not Provided", 
                                     "Manager Assessment": ""
                                 },
                                 {
                                     "Key Performance Indicators": "Professional Conduct & Learning Attitude", 
                                     "Target": "• Consistently follow organizational guidelines, maintain discipline, and demonstrate professional behavior.\n• Enhance skills regularly and reflect the learning in day-to-day work.", 
                                     "Weight": "5%", 
-                                    "Self-Assessment": "Not provided (Legacy KRA)", 
-                                    "Manager Assess": ""
+                                    "Self-Assessment": "Not Provided", 
+                                    "Manager Assessment": ""
                                 }
                             ]
 
@@ -642,12 +671,33 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                         notes = st.text_area("General Assessment Notes / Feedback")
                         rating = st.slider("Overall Rating (1-5)", 1, 5, 3)
                         
-                        if st.form_submit_button("Submit Assessment", type="primary"):
-                            with st.spinner("Saving assessment..."):
-                                tech_data = edited_tech_df.to_dict('records') if not edited_tech_df.empty else []
-                                assess_kra(k['kra_id'], notes, rating, tech_data, behav_data, get_or_create_sheet, safe_get_all_records, now_ist)
-                            st.success("Assessment saved!")
-                            st.rerun()
+                        st.markdown("---")
+                        col_btn1, col_btn2 = st.columns([1, 1])
+                        with col_btn1:
+                            if st.form_submit_button("✅ Finalize Assessment", type="primary"):
+                                with st.spinner("Saving assessment..."):
+                                    tech_data = edited_tech_df.to_dict('records') if not edited_tech_df.empty else []
+                                    assess_kra(k['kra_id'], notes, rating, tech_data, behav_data, get_or_create_sheet, safe_get_all_records, now_ist)
+                                    st.success("Assessment saved!")
+                                    st.rerun()
+                        with col_btn2:
+                            if st.button(f"🗑️ Delete Submission", key=f"btn_del_{k['kra_id']}", use_container_width=True, type="secondary"):
+                                try:
+                                    ws = get_or_create_sheet("hrms_kras", [])
+                                    records = safe_get_all_records(ws)
+                                    row_idx = -1
+                                    for i, r in enumerate(records):
+                                        if str(r.get("kra_id")) == str(k["kra_id"]):
+                                            row_idx = i + 2 # +1 for header, +1 for 0-index
+                                            break
+                                    if row_idx != -1:
+                                        ws.delete_rows(row_idx)
+                                        st.warning("🗑️ KRA Submission deleted.")
+                                        st.rerun()
+                                    else:
+                                        st.error("Could not find record to delete.")
+                                except Exception as e:
+                                    st.error(f"Error deleting record: {e}")
 
     with tab2:
         if not assessed:
