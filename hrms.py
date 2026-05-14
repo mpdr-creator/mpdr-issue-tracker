@@ -1,6 +1,7 @@
 import uuid
 import json
 import pandas as pd
+import streamlit as st
 
 # HRMS Constants
 DEPARTMENTS = ["Admin", "CADD", "MedChem", "API", "AR&D", "CDMO", "SSD"]
@@ -141,6 +142,7 @@ def assess_kra(kra_id, notes, rating, tech_assessment, behavioral_assessment, ge
     for i, r in enumerate(recs, start=2):
         if str(r.get("kra_id", "")) == kra_id:
             ws.update(f"H{i}:N{i}", [[tech_json, "ASSESSED", r["submitted_at"], now, notes, rating, behav_json]])
+            st.cache_data.clear()
             return
 
 def delete_kra(kra_id, get_or_create_sheet, safe_get_all_records):
@@ -465,93 +467,221 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
         curr_year_idx = 1
 
     if is_management:
-        st.markdown("### 🏢 Departmental Management")
+        st.markdown("### 🏢 Departmental KRA Management")
         col_m1, col_m2 = st.columns([2, 1])
         with col_m1:
-            selected_dept = st.selectbox("1. Select Department to View", ["All Departments"] + DEPARTMENTS)
+            selected_dept = st.selectbox("Select Department", ["-- Select Department --"] + DEPARTMENTS)
         with col_m2:
-            view_year = st.selectbox("2. Select Assessment Year", year_options, index=curr_year_idx)
+            view_year = st.selectbox("Select Year", year_options, index=curr_year_idx)
+        
+        if selected_dept == "-- Select Department --":
+            st.info("👆 Please select a department to view the KRA status grid.")
+            return
+        
+        # ─── Department Selected: Show Grid ───
+        st.markdown(f"#### 📊 {selected_dept} — {view_year} KRA Status")
+        dept_profiles = [p for p in profiles if p.get("department") == selected_dept]
+        
+        if not dept_profiles:
+            st.warning(f"No employee profiles found for **{selected_dept}**.")
+            return
+        
+        cycles = ["Q1", "Q2", "Q3", "Q4", "Half-Yearly", "Annual"]
+        grid_rows = []
+        kra_lookup = {}
+        
+        for p in dept_profiles:
+            email = p["email"]
+            name = p.get("full_name", email)
+            row = {"Employee": name, "Email": email}
+            for cycle in cycles:
+                kra = next((k for k in kras 
+                            if str(k.get("email", "")).strip().lower() == email.strip().lower()
+                            and str(k.get("year", "")).strip() == str(view_year).strip()
+                            and str(k.get("quarter", "")).strip() == cycle.strip()), None)
+                status = "N/A"
+                if kra:
+                    s = str(kra.get("status", "")).strip().upper()
+                    status = "Done" if s == "ASSESSED" else "Pending"
+                    kra_lookup[(email, cycle)] = kra
+                row[cycle] = status
+            grid_rows.append(row)
+        
+        # Render the color-coded HTML table
+        render_status_grid(st, grid_rows, cycles)
+        
+        # ─── Build actionable items list ───
+        actionable = []
+        for row in grid_rows:
+            for cycle in cycles:
+                if row[cycle] in ["Pending", "Done"]:
+                    actionable.append({
+                        "label": f"{row['Employee']}  ▸  {cycle}  ({row[cycle]})",
+                        "email": row["Email"],
+                        "cycle": cycle,
+                        "status": row[cycle]
+                    })
+        
+        if not actionable:
+            st.info("No KRAs submitted by employees in this department for the selected year.")
+            return
+        
+        st.markdown("---")
+        st.markdown("#### 📋 View / Assess Employee KRA")
+        
+        options_labels = [a["label"] for a in actionable]
+        selected_label = st.selectbox("Select an Employee & Quarter from the grid above:", options_labels, key="mgmt_kra_select")
+        sel = actionable[options_labels.index(selected_label)]
+        sel_email = sel["email"]
+        sel_cycle = sel["cycle"]
+        sel_status = sel["status"]
+        sel_kra = kra_lookup.get((sel_email, sel_cycle))
+        
+        if not sel_kra:
+            st.error("Could not find the KRA record. Please refresh.")
+            return
+        
+        sel_name = prof_map.get(sel_email, {}).get("full_name", sel_email)
+        sel_dept_name = prof_map.get(sel_email, {}).get("department", "Unknown")
+        
+        st.markdown("---")
+        
+        # ─── DONE: Read-only view ───
+        if sel_status == "Done":
+            st.markdown(f"""
+            <div style="background:white;padding:1.5rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.05);margin-bottom:1rem;border-left:4px solid #92d050;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:1rem;">
+                    <span style="font-weight:600;color:#0d2d5e;font-size:1.1rem;">✅ {sel_name} ({sel_dept_name}) — {view_year} {sel_cycle}</span>
+                    <span style="color:#3fb950;font-weight:bold;">Rating: {sel_kra.get('rating', 'N/A')}/5</span>
+                </div>
+                <div style="margin-bottom:0.8rem;"><strong>Assessment Notes:</strong><br>{sel_kra.get('assessment_notes', 'None')}</div>
+            </div>
+            """, unsafe_allow_html=True)
             
-        if selected_dept != "All Departments":
-            # Show the Grid for selected department
-            st.markdown(f"#### 📊 {selected_dept} - {view_year} KRA Completion Grid")
-            dept_profiles = [p for p in profiles if p.get("department") == selected_dept]
+            if sel_kra.get("tech_assessment"):
+                try:
+                    tech_list = json.loads(sel_kra["tech_assessment"])
+                    if tech_list:
+                        st.markdown("##### Technical Assessment")
+                        st.dataframe(pd.DataFrame(tech_list), use_container_width=True, hide_index=True)
+                except:
+                    pass
             
-            if not dept_profiles:
-                st.info(f"No employee profiles found for {selected_dept}.")
-            else:
-                cycles = ["Q1", "Q2", "Q3", "Q4", "Half-Yearly", "Annual"]
-                grid_rows = []
-                actionable_items = []  # For the selector below
-                for p in dept_profiles:
-                    email = p["email"]
-                    name = p.get("full_name", email)
-                    row = {"Employee": name}
-                    for cycle in cycles:
-                        # Find KRA for this cycle and year (Robust matching)
-                        kra = next((k for k in kras if str(k.get("email", "")).strip().lower() == email.strip().lower() 
-                                    and str(k.get("year", "")).strip() == str(view_year).strip() 
-                                    and str(k.get("quarter", "")).strip() == cycle.strip()), None)
-                        status = "N/A"
-                        if kra:
-                            s = str(kra.get("status", "")).strip().upper()
-                            status = "Done" if s == "ASSESSED" else "Pending"
-                        row[cycle] = status
-                        # Collect actionable items
-                        if status in ["Pending", "Done"]:
-                            actionable_items.append({"name": name, "email": email, "cycle": cycle, "status": status})
-                    row["Email"] = email
-                    grid_rows.append(row)
+            if sel_kra.get("behavioral_assessment"):
+                try:
+                    behav_list = json.loads(sel_kra["behavioral_assessment"])
+                    if behav_list:
+                        st.markdown("##### Behavioral Assessment")
+                        st.dataframe(pd.DataFrame(behav_list), use_container_width=True, hide_index=True)
+                except:
+                    pass
+        
+        # ─── PENDING: Editable assessment form ───
+        elif sel_status == "Pending":
+            st.markdown(f"""
+            <div style="background:#fff8e1;padding:1rem;border-radius:8px;border-left:4px solid #ffc000;margin-bottom:1rem;">
+                <strong>⏳ Pending Assessment:</strong> {sel_name} ({sel_dept_name}) — {view_year} {sel_cycle}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            with st.form(f"assess_form_{sel_kra['kra_id']}"):
+                st.markdown("##### Technical Assessment")
+                try:
+                    tech_list = json.loads(sel_kra.get("tech_assessment", "[]"))
+                except:
+                    tech_list = []
                 
-                # Render the color-coded HTML table
-                render_status_grid(st, grid_rows, cycles)
-                
-                # Interactive selector below the grid
-                if actionable_items:
-                    st.markdown("#### 🎯 Select from Grid to Open Assessment")
-                    options = [f"{item['name']} → {item['cycle']} ({item['status']})" for item in actionable_items]
-                    
-                    # Pre-select if a target is already set
-                    default_idx = 0
-                    if "target_email" in st.session_state and "target_quarter" in st.session_state:
-                        for idx, item in enumerate(actionable_items):
-                            if item["email"] == st.session_state.get("target_email") and item["cycle"] == st.session_state.get("target_quarter"):
-                                default_idx = idx
-                                break
-                    
-                    selected_action = st.selectbox("Click a status in the table, then select here:", options, index=default_idx, key="grid_action_select")
-                    
-                    col_go, col_clear = st.columns([1, 1])
-                    with col_go:
-                        if st.button("📋 Open Assessment", use_container_width=True, type="primary"):
-                            sel_item = actionable_items[options.index(selected_action)]
-                            st.session_state["target_email"] = sel_item["email"]
-                            st.session_state["target_year"] = view_year
-                            st.session_state["target_quarter"] = sel_item["cycle"]
-                            st.rerun()
-                    with col_clear:
-                        if "target_email" in st.session_state:
-                            if st.button("❌ Clear Selection", use_container_width=True):
-                                for key in ["target_email", "target_year", "target_quarter"]:
-                                    st.session_state.pop(key, None)
-                                st.rerun()
-                
-                # Show active selection if one exists
-                if "target_email" in st.session_state and st.session_state.get("target_email"):
-                    st.success(f"🎯 **Active:** {prof_map.get(st.session_state['target_email'], {}).get('full_name', st.session_state['target_email'])} — {st.session_state.get('target_quarter', '')} ({st.session_state.get('target_year', '')})")
+                if tech_list:
+                    df_tech = pd.DataFrame(tech_list)
+                    edited_tech_df = st.data_editor(
+                        df_tech,
+                        num_rows="fixed",
+                        use_container_width=True,
+                        key=f"tech_edit_{sel_kra['kra_id']}",
+                        column_config={
+                            "KPI": st.column_config.TextColumn(disabled=True),
+                            "Target": st.column_config.TextColumn(disabled=True),
+                            "Weightage (%)": st.column_config.NumberColumn(disabled=True),
+                            "Self-Assessment": st.column_config.TextColumn(disabled=True),
+                            "Manager Assessment": st.column_config.TextColumn("Manager Assessment", help="Provide your evaluation")
+                        }
+                    )
                 else:
-                    st.info("💡 **Select an employee's KRA from the dropdown above, then click 'Open Assessment'.**")
-                    return  # Don't show tabs until selection
-                    
+                    st.warning("No technical assessment data found.")
+                    edited_tech_df = pd.DataFrame()
+                
+                st.markdown("##### Behavioral Assessment")
+                try:
+                    behav_val = sel_kra.get("behavioral_assessment", "[]")
+                    behav_list = json.loads(behav_val) if behav_val and behav_val != "" else []
+                except:
+                    behav_list = []
+                
+                if not behav_list:
+                    behav_list = [
+                        {"Key Performance Indicators": "Professional Communication", "Target": "• Share precise updates in meetings and written communication.\n• Keep stakeholders informed about progress, risks, and concerns.", "Weight": "5%", "Self-Assessment": "Not Provided", "Manager Assessment": ""},
+                        {"Key Performance Indicators": "Ownership & Accountability", "Target": "• Take complete responsibility for deliverables and honor timelines.\n• Identify risks early and communicate corrective actions.", "Weight": "5%", "Self-Assessment": "Not Provided", "Manager Assessment": ""},
+                        {"Key Performance Indicators": "Team Collaboration & Adaptability", "Target": "• Collaborate constructively with team members to achieve goals.\n• Respond positively to priority changes while maintaining standards.", "Weight": "5%", "Self-Assessment": "Not Provided", "Manager Assessment": ""},
+                        {"Key Performance Indicators": "Professional Conduct & Learning Attitude", "Target": "• Follow organizational guidelines and demonstrate professional behavior.\n• Enhance skills regularly and reflect the learning in work.", "Weight": "5%", "Self-Assessment": "Not Provided", "Manager Assessment": ""}
+                    ]
+                
+                h1, h2, h3, h4, h5 = st.columns([2, 3, 0.8, 3, 3])
+                h1.markdown("**KPI**"); h2.markdown("**Target**"); h3.markdown("**Weight**"); h4.markdown("**Self-Assessment**"); h5.markdown("**Manager Assessment**")
+                st.markdown("<hr style='margin:0.5rem 0; border-top: 2px solid #0d2d5e;'>", unsafe_allow_html=True)
+                
+                edited_behav_list = []
+                for i, item in enumerate(behav_list):
+                    c1, c2, c3, c4, c5 = st.columns([2, 3, 0.8, 3, 3])
+                    c1.markdown(f"**{item['Key Performance Indicators']}**")
+                    c2.markdown(f"<div style='font-size:0.9rem;'>{item['Target']}</div>", unsafe_allow_html=True)
+                    c3.write(item['Weight'])
+                    c4.info(item.get('Self-Assessment', 'N/A'))
+                    mgr_val = c5.text_area(
+                        f"Manager Assessment for {item['Key Performance Indicators']}",
+                        value=item.get('Manager Assessment', ''),
+                        key=f"behav_mgr_{sel_kra['kra_id']}_{i}",
+                        height=120,
+                        label_visibility="collapsed"
+                    )
+                    edited_behav_list.append({**item, "Manager Assessment": mgr_val})
+                    st.markdown("<hr style='margin:0.3rem 0; border-top: 1px solid #eee;'>", unsafe_allow_html=True)
+                
+                behav_data = edited_behav_list
+                
                 st.markdown("---")
+                notes = st.text_area("General Assessment Notes / Feedback")
+                rating = st.slider("Overall Rating (1-5)", 1, 5, 3)
+                
+                st.markdown("---")
+                if st.form_submit_button("✅ Finalize Assessment", type="primary", use_container_width=True):
+                    with st.spinner("Saving assessment..."):
+                        tech_data = edited_tech_df.to_dict('records') if not edited_tech_df.empty else []
+                        assess_kra(sel_kra['kra_id'], notes, rating, tech_data, behav_data, get_or_create_sheet, safe_get_all_records, now_ist)
+                    st.success("Assessment saved!")
+                    st.rerun()
             
-            # Filter the global lists for the tabs below
-            dept_emails = [p["email"] for p in dept_profiles]
-            kras = [k for k in kras if k["email"] in dept_emails]
-        else:
-            st.info("💡 Select a specific department above to view the KRA completion grid.")
-
-    # Split KRAs for tabs
+            # Delete button outside form
+            if st.button("🗑️ Delete this Submission", key=f"btn_del_{sel_kra['kra_id']}", type="secondary"):
+                try:
+                    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment"])
+                    records = safe_get_all_records(ws)
+                    row_idx = -1
+                    for i, r in enumerate(records):
+                        if str(r.get("kra_id")) == str(sel_kra["kra_id"]):
+                            row_idx = i + 2
+                            break
+                    if row_idx != -1:
+                        ws.delete_rows(row_idx)
+                        st.warning("🗑️ KRA Submission deleted.")
+                        st.rerun()
+                    else:
+                        st.error("Could not find record to delete.")
+                except Exception as e:
+                    st.error(f"Error deleting: {e}")
+        
+        return  # Management view is self-contained
+    
+    # ─── Non-management: Original tab-based view ───
     pending = [k for k in kras if str(k.get("status", "")).strip().upper() == "SUBMITTED"]
     assessed = [k for k in kras if str(k.get("status", "")).strip().upper() == "ASSESSED"]
     
@@ -561,228 +691,48 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
         if not pending:
             st.success("🎉 All pending KRAs have been assessed!")
         else:
-            # 1. Select Employee
             pending_emails = sorted(list(set(k["email"] for k in pending)))
             
             def get_emp_label(email):
                 p = prof_map.get(email, {})
-                name = p.get("full_name", email)
-                dept = p.get("department", "Unknown")
-                return f"{name} ({dept})"
-
-            # Default to target_email if jump feature used
-            default_idx = 0
-            if "target_email" in st.session_state and st.session_state["target_email"] in pending_emails:
-                try:
-                    default_idx = pending_emails.index(st.session_state["target_email"])
-                except:
-                    pass
-
-            selected_email = st.selectbox("1. Select Employee", pending_emails, index=default_idx, format_func=get_emp_label)
+                return f"{p.get('full_name', email)} ({p.get('department', 'Unknown')})"
             
+            selected_email = st.selectbox("1. Select Employee", pending_emails, format_func=get_emp_label)
             if selected_email:
-                # 2. Select Year and Quarter for this employee
                 emp_pending = [k for k in pending if k["email"] == selected_email]
-                if not emp_pending:
-                    st.info("No pending assessments for this employee.")
-                else:
+                if emp_pending:
                     years = sorted(list(set(str(k["year"]) for k in emp_pending)), reverse=True)
-                    
-                    # Default Year from Jump
-                    y_idx = 0
-                    if "target_year" in st.session_state and str(st.session_state["target_year"]) in years:
-                        y_idx = years.index(str(st.session_state["target_year"]))
-                    
-                    selected_year = st.selectbox("2. Select Year", years, index=y_idx, key=f"yr_{selected_email}")
-                    
+                    selected_year = st.selectbox("2. Select Year", years, key=f"yr_{selected_email}")
                     available_quarters = sorted(list(set(k["quarter"] for k in emp_pending if str(k["year"]) == str(selected_year))))
+                    selected_quarter = st.selectbox("3. Select Quarter", available_quarters, key=f"qtr_{selected_email}")
                     
-                    # Default Quarter from Jump
-                    q_idx = 0
-                    if "target_quarter" in st.session_state and st.session_state["target_quarter"] in available_quarters:
-                        q_idx = available_quarters.index(st.session_state["target_quarter"])
-                        
-                    selected_quarter = st.selectbox("3. Select Quarter", available_quarters, index=q_idx, key=f"qtr_{selected_email}")
-                
-                # 3. Find the specific KRA (Pick latest if duplicates exist)
-                emp_pending_sorted = sorted(emp_pending, key=lambda x: x.get("submitted_at", ""), reverse=True)
-                k = next((k for k in emp_pending_sorted if str(k["year"]) == str(selected_year) and str(k["quarter"]) == str(selected_quarter)), None)
-                
-                if k:
-                    st.markdown("---")
-                    with st.form(f"assess_form_{k['kra_id']}"):
-                        st.markdown(f"#### Evaluation for {get_emp_label(selected_email)} - {selected_year} {selected_quarter}")
-                        
-                        # Technical Assessment
-                        st.markdown("##### Technical Assessment")
-                        try:
-                            tech_list = json.loads(k.get("tech_assessment", "[]"))
-                        except:
-                            tech_list = []
-                        
-                        if tech_list:
-                            df_tech = pd.DataFrame(tech_list)
-                            edited_tech_df = st.data_editor(
-                                df_tech, 
-                                num_rows="fixed", 
-                                use_container_width=True, 
-                                key=f"tech_edit_{k['kra_id']}",
-                                column_config={
-                                    "KPI": st.column_config.TextColumn(disabled=True),
-                                    "Target": st.column_config.TextColumn(disabled=True),
-                                    "Weightage (%)": st.column_config.NumberColumn(disabled=True),
-                                    "Self-Assessment": st.column_config.TextColumn(disabled=True),
-                                    "Manager Assessment": st.column_config.TextColumn("Manager Assessment", help="Provide your evaluation")
-                                }
-                            )
-                        else:
-                            st.warning("No technical assessment data found.")
-                            edited_tech_df = pd.DataFrame()
-                        
-                        # Behavioral Assessment
-                        st.markdown("##### Behavioral Assessment")
-                        try:
-                            behav_val = k.get("behavioral_assessment", "[]")
-                            behav_list = json.loads(behav_val) if behav_val and behav_val != "" else []
-                        except:
-                            behav_list = []
-                        
-                        if not behav_list:
-                            # Fallback template for legacy KRAs or if not provided
-                            behav_list = [
-                                {
-                                    "Key Performance Indicators": "Professional Communication", 
-                                    "Target": "• Share precise and well-structured updates in meetings and through written communication.\n• Ensure stakeholders are informed in advance about progress, risks, and concerns.", 
-                                    "Weight": "5%", 
-                                    "Self-Assessment": "Not Provided", 
-                                    "Manager Assessment": ""
-                                },
-                                {
-                                    "Key Performance Indicators": "Ownership & Accountability", 
-                                    "Target": "• Assume complete responsibility for assigned deliverables and honor committed timelines.\n• Identify potential risks early and communicate corrective actions proactively.", 
-                                    "Weight": "5%", 
-                                    "Self-Assessment": "Not Provided", 
-                                    "Manager Assessment": ""
-                                },
-                                {
-                                    "Key Performance Indicators": "Team Collaboration & Adaptability", 
-                                    "Target": "• Collaborate constructively with team members and other functions to achieve common goals.\n• Respond positively to priority changes while maintaining delivery standards.", 
-                                    "Weight": "5%", 
-                                    "Self-Assessment": "Not Provided", 
-                                    "Manager Assessment": ""
-                                },
-                                {
-                                    "Key Performance Indicators": "Professional Conduct & Learning Attitude", 
-                                    "Target": "• Consistently follow organizational guidelines, maintain discipline, and demonstrate professional behavior.\n• Enhance skills regularly and reflect the learning in day-to-day work.", 
-                                    "Weight": "5%", 
-                                    "Self-Assessment": "Not Provided", 
-                                    "Manager Assessment": ""
-                                }
-                            ]
-
-                        # Custom Header for Manager Assessment
-                        h1, h2, h3, h4, h5 = st.columns([2, 3, 0.8, 3, 3])
-                        h1.markdown("**KPI**")
-                        h2.markdown("**Target**")
-                        h3.markdown("**Weight**")
-                        h4.markdown("**Self-Assessment**")
-                        h5.markdown("**Manager Assessment**")
-                        st.markdown("<hr style='margin:0.5rem 0; border-top: 2px solid #0d2d5e;'>", unsafe_allow_html=True)
-
-                        edited_behav_list = []
-                        for i, item in enumerate(behav_list):
-                            c1, c2, c3, c4, c5 = st.columns([2, 3, 0.8, 3, 3])
-                            c1.markdown(f"**{item['Key Performance Indicators']}**")
-                            c2.markdown(f"<div style='font-size:0.9rem;'>{item['Target']}</div>", unsafe_allow_html=True)
-                            c3.write(item['Weight'])
-                            c4.info(item.get('Self-Assessment', 'N/A'))
-                            
-                            mgr_val = c5.text_area(
-                                f"Manager Assessment for {item['Key Performance Indicators']}",
-                                value=item.get('Manager Assessment', ''),
-                                key=f"behav_mgr_{k['kra_id']}_{i}",
-                                height=120,
-                                label_visibility="collapsed"
-                            )
-                            
-                            edited_behav_list.append({**item, "Manager Assessment": mgr_val})
-                            st.markdown("<hr style='margin:0.3rem 0; border-top: 1px solid #eee;'>", unsafe_allow_html=True)
-                        
-                        behav_data = edited_behav_list
-                        
+                    emp_pending_sorted = sorted(emp_pending, key=lambda x: x.get("submitted_at", ""), reverse=True)
+                    k = next((k for k in emp_pending_sorted if str(k["year"]) == str(selected_year) and str(k["quarter"]) == str(selected_quarter)), None)
+                    if k:
                         st.markdown("---")
-                        notes = st.text_area("General Assessment Notes / Feedback")
-                        rating = st.slider("Overall Rating (1-5)", 1, 5, 3)
-                        
-                        st.markdown("---")
-                        col_btn1, col_btn2 = st.columns([1, 1])
-                        with col_btn1:
-                            if st.form_submit_button("✅ Finalize Assessment", type="primary"):
-                                with st.spinner("Saving assessment..."):
-                                    tech_data = edited_tech_df.to_dict('records') if not edited_tech_df.empty else []
-                                    assess_kra(k['kra_id'], notes, rating, tech_data, behav_data, get_or_create_sheet, safe_get_all_records, now_ist)
-                                    st.success("Assessment saved!")
-                                    st.rerun()
-                        with col_btn2:
-                            if st.button(f"🗑️ Delete Submission", key=f"btn_del_{k['kra_id']}", use_container_width=True, type="secondary"):
-                                try:
-                                    ws = get_or_create_sheet("hrms_kras", [])
-                                    records = safe_get_all_records(ws)
-                                    row_idx = -1
-                                    for i, r in enumerate(records):
-                                        if str(r.get("kra_id")) == str(k["kra_id"]):
-                                            row_idx = i + 2 # +1 for header, +1 for 0-index
-                                            break
-                                    if row_idx != -1:
-                                        ws.delete_rows(row_idx)
-                                        st.warning("🗑️ KRA Submission deleted.")
-                                        st.rerun()
-                                    else:
-                                        st.error("Could not find record to delete.")
-                                except Exception as e:
-                                    st.error(f"Error deleting record: {e}")
-
+                        st.info(f"Pending assessment for **{get_emp_label(selected_email)}** — {selected_year} {selected_quarter}")
+    
     with tab2:
         if not assessed:
             st.info("No assessed KRAs.")
         else:
-            # Filtering and selection for history
             assessed_emails = sorted(list(set(k["email"] for k in assessed)))
             
-            default_h_idx = 0
-            if "target_email" in st.session_state and st.session_state["target_email"] in assessed_emails:
-                try:
-                    default_h_idx = assessed_emails.index(st.session_state["target_email"])
-                except:
-                    pass
-
-            h_email = st.selectbox("1. Select Employee (History)", assessed_emails, index=default_h_idx, format_func=get_emp_label, key="h_email")
+            def get_emp_label_h(email):
+                p = prof_map.get(email, {})
+                return f"{p.get('full_name', email)} ({p.get('department', 'Unknown')})"
             
+            h_email = st.selectbox("1. Select Employee", assessed_emails, format_func=get_emp_label_h, key="h_email")
             emp_assessed = [k for k in assessed if k["email"] == h_email]
             h_years = sorted(list(set(str(k["year"]) for k in emp_assessed)), reverse=True)
-            
-            y_h_idx = 0
-            if "target_year" in st.session_state and str(st.session_state["target_year"]) in h_years:
-                y_h_idx = h_years.index(str(st.session_state["target_year"]))
-
-            h_year = st.selectbox("2. Select Year", h_years, index=y_h_idx, key=f"h_yr_{h_email}")
-            
+            h_year = st.selectbox("2. Select Year", h_years, key=f"h_yr_{h_email}")
             h_quarters = sorted(list(set(k["quarter"] for k in emp_assessed if str(k["year"]) == str(h_year))))
-            
-            q_h_idx = 0
-            if "target_quarter" in st.session_state and st.session_state["target_quarter"] in h_quarters:
-                q_h_idx = h_quarters.index(st.session_state["target_quarter"])
-
-            h_quarter = st.selectbox("3. Select Quarter", h_quarters, index=q_h_idx, key=f"h_qtr_{h_email}")
+            h_quarter = st.selectbox("3. Select Quarter", h_quarters, key=f"h_qtr_{h_email}")
             
             k = next((k for k in emp_assessed if str(k["year"]) == str(h_year) and k["quarter"] == h_quarter), None)
-            
             if k:
                 h_name = prof_map.get(h_email, {}).get("full_name", h_email)
                 h_dept = prof_map.get(h_email, {}).get("department", "Unknown")
-                st.markdown(f"### 📋 Assessment Record: {h_quarter} {h_year}")
-                # Render history details...
-                
                 st.markdown(f"""
                 <div style="background:white;padding:1.5rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.05);margin-bottom:1rem;border-left:4px solid #3fb950;">
                     <div style="display:flex;justify-content:space-between;margin-bottom:1rem;">
@@ -790,6 +740,7 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                         <span style="color:#3fb950;font-weight:bold;">Rating: {k['rating']}/5</span>
                     </div>
                     <div style="margin-bottom:0.8rem;"><strong>Assessment Notes:</strong><br>{k['assessment_notes']}</div>
+                </div>
                 """, unsafe_allow_html=True)
                 
                 if k.get("tech_assessment"):
@@ -800,7 +751,6 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                             st.dataframe(pd.DataFrame(tech_list), use_container_width=True, hide_index=True)
                     except:
                         pass
-                
                 if k.get("behavioral_assessment"):
                     try:
                         behav_list = json.loads(k["behavioral_assessment"])
@@ -809,5 +759,4 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                             st.dataframe(pd.DataFrame(behav_list), use_container_width=True, hide_index=True)
                     except:
                         pass
-                
-                st.markdown("</div>", unsafe_allow_html=True)
+
