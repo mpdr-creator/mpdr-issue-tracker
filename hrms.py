@@ -496,20 +496,48 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                             s = str(kra.get("status", "")).strip().upper()
                             status = "Done" if s == "ASSESSED" else "Pending"
                         row[cycle] = status
+                    row["Email"] = email # Hidden but needed for logic
                     grid_rows.append(row)
                 
-                render_status_grid(st, grid_rows, cycles)
+                # Interactive Grid using st.dataframe
+                grid_df = pd.DataFrame(grid_rows)
+                cols_to_show = ["Employee"] + cycles
                 
-                # Jump to Assessment Feature
-                st.markdown("---")
-                st.markdown("#### 🎯 Quick Assessment Selector")
-                emp_list = [f"{p.get('full_name', p['email'])} | {p['email']}" for p in dept_profiles]
-                selected_for_jump = st.selectbox("Select Employee from the table above to start assessment:", ["-- Choose --"] + emp_list)
-                if selected_for_jump != "-- Choose --":
-                    jump_email = selected_for_jump.split(" | ")[1]
-                    st.session_state["target_email"] = jump_email
-                    st.info(f"✅ {selected_for_jump.split(' | ')[0]} selected. Scroll down to the 'Pending Assessment' tab.")
+                def style_grid(val):
+                    if val == "Done": return "background-color: #92d050; color: black;"
+                    if val == "Pending": return "background-color: #ffc000; color: black;"
+                    if val == "N/A": return "background-color: #ff0000; color: white;"
+                    return ""
+
+                st.info("👉 **Click a cell (Pending/Done) to open that specific KRA for assessment.**")
                 
+                # Use st.dataframe with selection
+                event = st.dataframe(
+                    grid_df[cols_to_show].style.applymap(style_grid, subset=cycles),
+                    use_container_width=True,
+                    hide_index=True,
+                    on_select="rerun",
+                    selection_mode="single_cell"
+                )
+
+                # Handle Selection Event
+                if event and "selection" in event and event["selection"]["cells"]:
+                    sel = event["selection"]["cells"][0]
+                    r_idx = sel["row"]
+                    c_idx = sel["column"]
+                    
+                    if c_idx > 0: # Not the Employee column
+                        sel_cycle = cycles[c_idx - 1]
+                        sel_email = grid_rows[r_idx]["Email"]
+                        sel_status = grid_rows[r_idx][sel_cycle]
+                        
+                        if sel_status != "N/A":
+                            st.session_state["target_email"] = sel_email
+                            st.session_state["target_year"] = view_year
+                            st.session_state["target_quarter"] = sel_cycle
+                            st.success(f"🎯 Selected: {grid_rows[r_idx]['Employee']} - {sel_cycle}. Scroll down to assessment tabs.")
+                            st.rerun()
+
                 st.markdown("---")
             
             # Filter the global lists for the tabs below
@@ -550,16 +578,26 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
             if selected_email:
                 # 2. Select Year and Quarter for this employee
                 emp_pending = [k for k in pending if k["email"] == selected_email]
-                
-                years = sorted(list(set(k["year"] for k in emp_pending)), reverse=True)
-                col_y, col_q = st.columns(2)
-                
-                with col_y:
-                    selected_year = st.selectbox("2. Select Year", years)
-                
-                with col_q:
-                    available_quarters = sorted(list(set(k["quarter"] for k in emp_pending if k["year"] == selected_year)))
-                    selected_quarter = st.selectbox("3. Select Quarter / Cycle", available_quarters)
+                if not emp_pending:
+                    st.info("No pending assessments for this employee.")
+                else:
+                    years = sorted(list(set(str(k["year"]) for k in emp_pending)), reverse=True)
+                    
+                    # Default Year from Jump
+                    y_idx = 0
+                    if "target_year" in st.session_state and str(st.session_state["target_year"]) in years:
+                        y_idx = years.index(str(st.session_state["target_year"]))
+                    
+                    selected_year = st.selectbox("2. Select Year", years, index=y_idx, key=f"yr_{selected_email}")
+                    
+                    available_quarters = sorted(list(set(k["quarter"] for k in emp_pending if str(k["year"]) == str(selected_year))))
+                    
+                    # Default Quarter from Jump
+                    q_idx = 0
+                    if "target_quarter" in st.session_state and st.session_state["target_quarter"] in available_quarters:
+                        q_idx = available_quarters.index(st.session_state["target_quarter"])
+                        
+                    selected_quarter = st.selectbox("3. Select Quarter", available_quarters, index=q_idx, key=f"qtr_{selected_email}")
                 
                 # 3. Find the specific KRA (Pick latest if duplicates exist)
                 emp_pending_sorted = sorted(emp_pending, key=lambda x: x.get("submitted_at", ""), reverse=True)
@@ -703,10 +741,40 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
         if not assessed:
             st.info("No assessed KRAs.")
         else:
-            for k in reversed(assessed):
-                p = prof_map.get(k["email"], {})
-                name = p.get("full_name", k["email"])
-                dept = p.get("department", "Unknown Dept")
+            # Filtering and selection for history
+            assessed_emails = sorted(list(set(k["email"] for k in assessed)))
+            
+            default_h_idx = 0
+            if "target_email" in st.session_state and st.session_state["target_email"] in assessed_emails:
+                try:
+                    default_h_idx = assessed_emails.index(st.session_state["target_email"])
+                except:
+                    pass
+
+            h_email = st.selectbox("1. Select Employee (History)", assessed_emails, index=default_h_idx, format_func=get_emp_label, key="h_email")
+            
+            emp_assessed = [k for k in assessed if k["email"] == h_email]
+            h_years = sorted(list(set(str(k["year"]) for k in emp_assessed)), reverse=True)
+            
+            y_h_idx = 0
+            if "target_year" in st.session_state and str(st.session_state["target_year"]) in h_years:
+                y_h_idx = h_years.index(str(st.session_state["target_year"]))
+
+            h_year = st.selectbox("2. Select Year", h_years, index=y_h_idx, key=f"h_yr_{h_email}")
+            
+            h_quarters = sorted(list(set(k["quarter"] for k in emp_assessed if str(k["year"]) == str(h_year))))
+            
+            q_h_idx = 0
+            if "target_quarter" in st.session_state and st.session_state["target_quarter"] in h_quarters:
+                q_h_idx = h_quarters.index(st.session_state["target_quarter"])
+
+            h_quarter = st.selectbox("3. Select Quarter", h_quarters, index=q_h_idx, key=f"h_qtr_{h_email}")
+            
+            k = next((k for k in emp_assessed if str(k["year"]) == str(h_year) and k["quarter"] == h_quarter), None)
+            
+            if k:
+                st.markdown(f"### 📋 Assessment Record: {h_quarter} {h_year}")
+                # Render history details...
                 
                 st.markdown(f"""
                 <div style="background:white;padding:1.5rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.05);margin-bottom:1rem;border-left:4px solid #3fb950;">
