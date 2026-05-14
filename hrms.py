@@ -524,31 +524,42 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
         # Render the color-coded HTML table
         render_status_grid(st, grid_rows, cycles)
         
-        # ─── Build actionable items list ───
-        actionable = []
+        # ─── Employee + Quarter selectors ───
+        # Build list of employees who have at least one KRA submitted
+        employees_with_kras = []
         for row in grid_rows:
-            for cycle in cycles:
-                if row[cycle] in ["Pending", "Done"]:
-                    actionable.append({
-                        "label": f"{row['Employee']}  ▸  {cycle}  ({row[cycle]})",
-                        "email": row["Email"],
-                        "cycle": cycle,
-                        "status": row[cycle]
-                    })
+            has_kra = any(row[c] in ["Pending", "Done"] for c in cycles)
+            if has_kra:
+                employees_with_kras.append({"name": row["Employee"], "email": row["Email"]})
         
-        if not actionable:
+        if not employees_with_kras:
             st.info("No KRAs submitted by employees in this department for the selected year.")
             return
         
         st.markdown("---")
-        st.markdown("#### 📋 View / Assess Employee KRA")
         
-        options_labels = [a["label"] for a in actionable]
-        selected_label = st.selectbox("Select an Employee & Quarter from the grid above:", options_labels, key="mgmt_kra_select")
-        sel = actionable[options_labels.index(selected_label)]
-        sel_email = sel["email"]
-        sel_cycle = sel["cycle"]
-        sel_status = sel["status"]
+        col_sel1, col_sel2 = st.columns(2)
+        with col_sel1:
+            emp_names = [e["name"] for e in employees_with_kras]
+            sel_emp_name = st.selectbox("👤 Select Employee", emp_names, key="mgmt_emp_sel")
+            sel_emp = next(e for e in employees_with_kras if e["name"] == sel_emp_name)
+            sel_email = sel_emp["email"]
+        
+        with col_sel2:
+            # Only show quarters that have data for this employee
+            sel_row = next(r for r in grid_rows if r["Email"] == sel_email)
+            available_cycles = []
+            for c in cycles:
+                if sel_row[c] in ["Pending", "Done"]:
+                    tag = "✅ Done" if sel_row[c] == "Done" else "⏳ Pending"
+                    available_cycles.append({"cycle": c, "label": f"{c}  —  {tag}", "status": sel_row[c]})
+            
+            cycle_labels = [a["label"] for a in available_cycles]
+            sel_cycle_label = st.selectbox("📅 Select Quarter", cycle_labels, key="mgmt_qtr_sel")
+            sel_item = available_cycles[cycle_labels.index(sel_cycle_label)]
+            sel_cycle = sel_item["cycle"]
+            sel_status = sel_item["status"]
+        
         sel_kra = kra_lookup.get((sel_email, sel_cycle))
         
         if not sel_kra:
@@ -557,6 +568,7 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
         
         sel_name = prof_map.get(sel_email, {}).get("full_name", sel_email)
         sel_dept_name = prof_map.get(sel_email, {}).get("department", "Unknown")
+
         
         st.markdown("---")
         
