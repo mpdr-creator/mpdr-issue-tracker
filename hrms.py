@@ -499,52 +499,42 @@ def page_hrms_assess(st, session_state, get_or_create_sheet, safe_get_all_record
                     row["Email"] = email # Hidden but needed for logic
                     grid_rows.append(row)
                 
-                # Interactive Grid using st.dataframe
-                grid_df = pd.DataFrame(grid_rows)
-                cols_to_show = ["Employee"] + cycles
+                # Interactive Grid using st.columns and buttons
+                st.info("👉 **Click on a 'Pending' or 'Done' box to open that KRA for assessment.**")
                 
-                def style_grid(val):
-                    if val == "Done": return "background-color: #92d050; color: black;"
-                    if val == "Pending": return "background-color: #ffc000; color: black;"
-                    if val == "N/A": return "background-color: #ff0000; color: white;"
-                    return ""
-
-                st.info("👉 **Click a cell (Pending/Done) to open that specific KRA for assessment.**")
+                # Header Row
+                h_cols = st.columns([2.5, 1, 1, 1, 1, 1, 1])
+                h_cols[0].markdown("**Employee**")
+                for i, cycle in enumerate(cycles):
+                    h_cols[i+1].markdown(f"**{cycle}**")
                 
-                # Use st.dataframe with selection
-                styler = grid_df[cols_to_show].style
-                # Use .map for newer pandas, fallback to .applymap for older
-                if hasattr(styler, "map"):
-                    styler = styler.map(style_grid, subset=cycles)
-                else:
-                    styler = styler.applymap(style_grid, subset=cycles)
-
-                event = st.dataframe(
-                    styler,
-                    use_container_width=True,
-                    hide_index=True,
-                    on_select="rerun",
-                    selection_mode="single_cell"
-                )
-
-                # Handle Selection Event
-                if event and "selection" in event and event["selection"]["cells"]:
-                    sel = event["selection"]["cells"][0]
-                    r_idx = sel["row"]
-                    c_idx = sel["column"]
-                    
-                    if c_idx > 0: # Not the Employee column
-                        sel_cycle = cycles[c_idx - 1]
-                        sel_email = grid_rows[r_idx]["Email"]
-                        sel_status = grid_rows[r_idx][sel_cycle]
+                st.markdown("<hr style='margin:0.2rem 0;'>", unsafe_allow_html=True)
+                
+                for r_idx, row in enumerate(grid_rows):
+                    r_cols = st.columns([2.5, 1, 1, 1, 1, 1, 1])
+                    r_cols[0].write(f"**{row['Employee']}**")
+                    for i, cycle in enumerate(cycles):
+                        status = row[cycle]
+                        btn_key = f"grid_btn_{row['Email']}_{cycle}_{view_year}"
                         
-                        if sel_status != "N/A":
-                            st.session_state["target_email"] = sel_email
-                            st.session_state["target_year"] = view_year
-                            st.session_state["target_quarter"] = sel_cycle
-                            st.success(f"🎯 Selected: {grid_rows[r_idx]['Employee']} - {sel_cycle}. Scroll down to assessment tabs.")
-                            st.rerun()
-
+                        if status == "Pending":
+                            # Use Primary button for Pending (Amber-ish in many themes)
+                            if r_cols[i+1].button("Pending", key=btn_key, use_container_width=True, type="primary"):
+                                st.session_state["target_email"] = row["Email"]
+                                st.session_state["target_year"] = view_year
+                                st.session_state["target_quarter"] = cycle
+                                st.rerun()
+                        elif status == "Done":
+                            # Use Secondary button for Done
+                            if r_cols[i+1].button("Done", key=btn_key, use_container_width=True):
+                                st.session_state["target_email"] = row["Email"]
+                                st.session_state["target_year"] = view_year
+                                st.session_state["target_quarter"] = cycle
+                                st.rerun()
+                        else:
+                            # N/A is just text or disabled button
+                            r_cols[i+1].button("N/A", key=btn_key, use_container_width=True, disabled=True)
+                
                 st.markdown("---")
             
             # Filter the global lists for the tabs below
