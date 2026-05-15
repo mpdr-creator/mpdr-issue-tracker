@@ -134,6 +134,17 @@ def submit_kra(email, year, quarter, objectives, achievements, challenges, tech_
     behav_json = json.dumps(behavioral_assessment)
     ws.append_row([kra_id, email, year, quarter, objectives, achievements, challenges, tech_json, "SUBMITTED", now, "", "", "", behav_json, department])
 
+def update_kra(kra_id, tech_assessment, behavioral_assessment, get_or_create_sheet, safe_get_all_records):
+    ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment", "department"])
+    recs = safe_get_all_records(ws)
+    tech_json = json.dumps(tech_assessment)
+    behav_json = json.dumps(behavioral_assessment)
+    for i, r in enumerate(recs, start=2):
+        if str(r.get("kra_id", "")) == kra_id:
+            ws.update(f"H{i}", tech_json)
+            ws.update(f"N{i}", behav_json)
+            return
+
 def assess_kra(kra_id, notes, rating, tech_assessment, behavioral_assessment, get_or_create_sheet, safe_get_all_records, now_ist):
     ws = get_or_create_sheet("hrms_kras", ["kra_id", "email", "year", "quarter", "objectives", "achievements", "challenges", "tech_assessment", "status", "submitted_at", "assessed_at", "assessment_notes", "rating", "behavioral_assessment", "department"])
     recs = safe_get_all_records(ws)
@@ -368,12 +379,71 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # Delete option
-                if st.button(f"🗑️ Delete {k['year']} {k['quarter']} KRA", key=f"del_{k['kra_id']}", type="secondary"):
-                    with st.spinner("Deleting record..."):
-                        delete_kra(k['kra_id'], get_or_create_sheet, safe_get_all_records)
-                    st.success("KRA deleted successfully!")
-                    st.rerun()
+                # Edit/Delete options - Only allowed if NOT yet assessed
+                if status != "ASSESSED":
+                    edit_col, del_col = st.columns([1, 1])
+                    with edit_col:
+                        if st.button(f"✏️ Edit {k['year']} {k['quarter']} KRA", key=f"edit_btn_{k['kra_id']}", use_container_width=True):
+                            st.session_state[f"editing_{k['kra_id']}"] = True
+                    with del_col:
+                        if st.button(f"🗑️ Delete {k['year']} {k['quarter']} KRA", key=f"del_{k['kra_id']}", type="secondary", use_container_width=True):
+                            with st.spinner("Deleting record..."):
+                                delete_kra(k['kra_id'], get_or_create_sheet, safe_get_all_records)
+                            st.success("KRA deleted successfully!")
+                            st.rerun()
+                    
+                    if st.session_state.get(f"editing_{k['kra_id']}", False):
+                        st.markdown(f"### ✏️ Editing {k['year']} {k['quarter']} KRA")
+                        with st.form(f"edit_form_{k['kra_id']}"):
+                            # 1. Technical Assessment Edit
+                            st.markdown("#### Technical Assessment")
+                            try:
+                                old_tech = json.loads(k.get("tech_assessment", "[]"))
+                            except:
+                                old_tech = []
+                            
+                            df_tech_edit = pd.DataFrame(old_tech) if old_tech else pd.DataFrame([{"KPI": "", "Target": "", "Weightage (%)": 0, "Self-Assessment": "", "Manager Assessment": ""}])
+                            edited_tech_df = st.data_editor(
+                                df_tech_edit, 
+                                num_rows="dynamic", 
+                                use_container_width=True, 
+                                key=f"edit_tech_{k['kra_id']}",
+                                column_config={"Manager Assessment": st.column_config.TextColumn(disabled=True)}
+                            )
+                            
+                            # 2. Behavioral Assessment Edit
+                            st.markdown("#### Behavioral Assessment")
+                            try:
+                                old_behav = json.loads(k.get("behavioral_assessment", "[]"))
+                            except:
+                                old_behav = []
+                            
+                            new_behav_inputs = {}
+                            if old_behav:
+                                for i, b_item in enumerate(old_behav):
+                                    st.markdown(f"**{b_item['Key Performance Indicators']}** ({b_item['Weight']})")
+                                    new_behav_inputs[i] = st.text_area(f"Self-Assessment", value=b_item.get("Self-Assessment", ""), key=f"edit_behav_{k['kra_id']}_{i}", height=100)
+                            
+                            col_eb1, col_eb2 = st.columns(2)
+                            if col_eb1.form_submit_button("💾 Save Changes", type="primary", use_container_width=True):
+                                # Build updated behavioral list
+                                updated_behav = []
+                                for i, b_item in enumerate(old_behav):
+                                    updated_behav.append({
+                                        **b_item,
+                                        "Self-Assessment": new_behav_inputs[i]
+                                    })
+                                
+                                update_kra(k['kra_id'], edited_tech_df.to_dict('records'), updated_behav, get_or_create_sheet, safe_get_all_records)
+                                st.session_state[f"editing_{k['kra_id']}"] = False
+                                st.success("KRA updated successfully!")
+                                st.rerun()
+                                
+                            if col_eb2.form_submit_button("❌ Cancel", use_container_width=True):
+                                st.session_state[f"editing_{k['kra_id']}"] = False
+                                st.rerun()
+                else:
+                    st.markdown('<div style="color:#b30000; font-size:0.85rem; font-weight:600; margin-bottom:1rem;">🔒 Deletion locked: This KRA has already been assessed by the manager.</div>', unsafe_allow_html=True)
                 
                 # Always show tech assessment table if available
                 if k.get("tech_assessment"):
