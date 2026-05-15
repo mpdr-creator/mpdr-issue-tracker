@@ -233,16 +233,26 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
     email = session_state.email
     kras = [k for k in all_hrms_kras(get_or_create_sheet, safe_get_all_records) if k.get("email") == email]
     
-    # Prepare status grid data for the current year
+    # Year selection at the top (Global for the page)
     import datetime
-    curr_year = str(datetime.datetime.now().year)
+    this_year = str(datetime.datetime.now().year)
+    year_options = ["2024", "2025", "2026", "2027"]
+    default_year_idx = year_options.index(this_year) if this_year in year_options else 2
+    
+    col_t1, col_t2 = st.columns([3, 1])
+    with col_t1:
+        st.markdown(f"#### 📊 KRA Status Overview")
+    with col_t2:
+        selected_year = st.selectbox("Select Year", year_options, index=default_year_idx, key="kra_global_year")
+    
+    # Prepare status grid data for the SELECTED year
     cycles = ["Q1", "Q2", "Q3", "Q4", "Half-Yearly", "Annual"]
     grid_rows = []
     
     summary_row = {"Employee": "My Submission Status", "Email": email}
     for cycle in cycles:
         kra = next((k for k in kras 
-                    if str(k.get("year", "")).strip() == curr_year
+                    if str(k.get("year", "")).strip() == selected_year
                     and str(k.get("quarter", "")).strip() == cycle), None)
         status_val = "N/A"
         if kra:
@@ -251,7 +261,6 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
         summary_row[cycle] = status_val
     grid_rows.append(summary_row)
     
-    st.markdown(f"#### 📊 {curr_year} KRA Status Overview")
     render_status_grid(st, grid_rows, cycles)
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -262,7 +271,7 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
     tab1, tab2 = st.tabs(["Submit New KRA", "My Previous KRAs"])
     
     with tab1:
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
             # Pre-select user's department
             dept_idx = 0
@@ -270,11 +279,10 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                 dept_idx = DEPARTMENTS.index(user_dept)
             kra_dept = st.selectbox("Department", DEPARTMENTS, index=dept_idx)
         with col2:
-            year = st.selectbox("Year", ["2024", "2025", "2026", "2027"])
-        with col3:
             quarter = st.selectbox("Quarter / Cycle", ["Q1", "Q2", "Q3", "Q4", "Half-Yearly", "Annual"])
 
         can_submit = True
+        year = selected_year # Use the global year selection
         existing_kra = next((k for k in kras if str(k["year"]) == str(year) and str(k["quarter"]) == str(quarter)), None)
         
         if existing_kra:
