@@ -107,7 +107,7 @@ def render_status_grid(st, rows, cycles):
     .status-cell { font-weight: bold; width: 120px; }
     .status-done { background-color: #92d050; color: black; } 
     .status-pending { background-color: #ffc000; color: black; }
-    .status-na { background-color: #ff6b6b; color: white; }
+    .status-na { background-color: #ffdada; color: #b30000; }
     </style>
     """, unsafe_allow_html=True)
     
