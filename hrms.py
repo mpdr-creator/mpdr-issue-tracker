@@ -395,10 +395,13 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                 st.rerun()
                     
     with tab2:
-        if not kras:
-            st.info("No KRAs submitted yet.")
+        # Filter KRAs by the global selected year
+        filtered_kras = [k for k in kras if str(k.get("year", "")).strip() == selected_year]
+        
+        if not filtered_kras:
+            st.info(f"No KRAs found for the year {selected_year}.")
         else:
-            for k in reversed(kras):
+            for k in reversed(filtered_kras):
                 status = str(k.get("status", "")).strip()
                 status_color = "#f0a500" if status == "SUBMITTED" else "#3fb950"
                 st.markdown(f"""
