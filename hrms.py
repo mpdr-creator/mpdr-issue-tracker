@@ -233,6 +233,28 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
     email = session_state.email
     kras = [k for k in all_hrms_kras(get_or_create_sheet, safe_get_all_records) if k.get("email") == email]
     
+    # Prepare status grid data for the current year
+    import datetime
+    curr_year = str(datetime.datetime.now().year)
+    cycles = ["Q1", "Q2", "Q3", "Q4", "Half-Yearly", "Annual"]
+    grid_rows = []
+    
+    summary_row = {"Employee": "My Submission Status", "Email": email}
+    for cycle in cycles:
+        kra = next((k for k in kras 
+                    if str(k.get("year", "")).strip() == curr_year
+                    and str(k.get("quarter", "")).strip() == cycle), None)
+        status_val = "N/A"
+        if kra:
+            s = str(kra.get("status", "")).strip().upper()
+            status_val = "Done" if s == "ASSESSED" else "Pending"
+        summary_row[cycle] = status_val
+    grid_rows.append(summary_row)
+    
+    st.markdown(f"#### 📊 {curr_year} KRA Status Overview")
+    render_status_grid(st, grid_rows, cycles)
+    st.markdown("<br>", unsafe_allow_html=True)
+    
     # Get user's department from profile
     profile = get_hrms_profile(email, get_or_create_sheet, safe_get_all_records)
     user_dept = profile.get("department", "") if profile else ""
