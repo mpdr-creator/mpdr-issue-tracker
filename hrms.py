@@ -379,8 +379,17 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # Edit/Delete options - Only allowed if NOT yet assessed
-                if status != "ASSESSED":
+                # DEBUG: Uncomment the line below if restriction fails
+                # st.write(f"DEBUG: Status='{status}', IsAssessed={status.strip().upper() == 'ASSESSED'}")
+                
+                # Check if assessed by multiple indicators (Status, Rating, or Notes)
+                is_assessed_status = (status.strip().upper() == "ASSESSED")
+                has_rating = k.get("rating") is not None and str(k.get("rating")).strip() != ""
+                has_notes = k.get("assessment_notes") is not None and str(k.get("assessment_notes")).strip() != ""
+                
+                is_locked = is_assessed_status or has_rating or has_notes
+                
+                if not is_locked:
                     edit_col, del_col = st.columns([1, 1])
                     with edit_col:
                         if st.button(f"✏️ Edit {k['year']} {k['quarter']} KRA", key=f"edit_btn_{k['kra_id']}", use_container_width=True):
@@ -426,13 +435,9 @@ def page_hrms_kra(st, session_state, get_or_create_sheet, safe_get_all_records, 
                             
                             col_eb1, col_eb2 = st.columns(2)
                             if col_eb1.form_submit_button("💾 Save Changes", type="primary", use_container_width=True):
-                                # Build updated behavioral list
                                 updated_behav = []
                                 for i, b_item in enumerate(old_behav):
-                                    updated_behav.append({
-                                        **b_item,
-                                        "Self-Assessment": new_behav_inputs[i]
-                                    })
+                                    updated_behav.append({**b_item, "Self-Assessment": new_behav_inputs[i]})
                                 
                                 update_kra(k['kra_id'], edited_tech_df.to_dict('records'), updated_behav, get_or_create_sheet, safe_get_all_records)
                                 st.session_state[f"editing_{k['kra_id']}"] = False
