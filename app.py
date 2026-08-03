@@ -243,7 +243,6 @@ def render_ares_table():
 <th style="padding:15px 10px;">Responsibility</th>
 <th style="padding:15px 10px;">Concerned Person</th>
 <th style="padding:15px 10px;">Email</th>
-<th style="padding:15px 10px;">Phone Number</th>
 </tr>
 </thead>
 <tbody>
@@ -256,7 +255,6 @@ def render_ares_table():
 <td style="padding:18px 10px; color:#020617; font-size:0.95rem; line-height:1.5; font-weight:500;">{info['Responsibility']}</td>
 <td style="padding:18px 10px; color:#020617; font-weight:700; font-size:1.05rem; text-align:center;">{info['Concerned Person']}</td>
 <td style="padding:18px 10px; text-align:center;"><a href="mailto:{email_display}" style="color:#0284c7; text-decoration:none; font-weight:600;">{email_display}</a></td>
-<td style="padding:18px 10px; color:#9a3412; font-family:monospace; font-weight:700; text-align:center;">{info['Phone']}</td>
 </tr>
 """
     html += "</tbody></table></div>"
