@@ -473,7 +473,6 @@ def update_user_password(email, new_password):
                 h = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
                 # Assuming email is col 1, password is col 2 (1-indexed)
                 ws.update_cell(i + 2, 2, h)
-                all_users.clear()
                 return True
     except Exception as e:
         st.error(f"Error updating password: {e}")
@@ -725,7 +724,7 @@ def get_resolution_time_str(t):
         cat = pd.to_datetime(t["created_at"])
         uat = pd.to_datetime(t["updated_at"])
         hrs = (uat - cat).total_seconds() / 3600
-        if hrs < 1: return f"{int(hrs*60)} mins"
+        if hrs < 1: return f"{int(hrs*60)} mins" 
         return f"{hrs:.1f} hrs"
     except: return ""
 
