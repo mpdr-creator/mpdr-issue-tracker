@@ -1133,9 +1133,13 @@ def page_resolved():
             fb_ui = '<div style="margin-top:6px;color:#8b949e;font-size:0.82rem;">⏳ Awaiting feedback</div>'
         rt = get_resolution_time_str(t)
         rt_badge = f" &nbsp;&nbsp; ⏱️ Time: {rt}" if rt else ""
+        rdept = str(t.get("reporter_dept") or "").strip()
+        dept_badge = f" &nbsp;&nbsp; 🏢 {rdept}" if rdept else ""
+        closed_lbl = "Closed" if t["status"] == "CLOSED" else "Resolved"
         st.markdown(f"""<div class="ticket-card low"><div class="ticket-id">#{t['ticket_id'][:8].upper()}</div>
 <div class="ticket-title">{t['title']}</div>
-<div class="ticket-meta">{sb(t['status'])} &nbsp; {pb(t['priority'])} &nbsp; 👤 {t['created_by']} &nbsp;&nbsp; 📅 {t['updated_at']}{rt_badge}</div>
+<div class="ticket-meta">{sb(t['status'])} &nbsp; {pb(t['priority'])} &nbsp; 👤 {t['created_by']}{dept_badge}</div>
+<div class="ticket-meta" style="margin-top:4px;">📅 Raised: {t['created_at']} &nbsp;&nbsp; ✅ {closed_lbl}: {t['updated_at']}{rt_badge}</div>
 {f'<div style="margin-top:8px;color:#3fb950;font-size:0.85rem;">✅ {t["resolution_notes"]}</div>' if t.get("resolution_notes") else ""}
 {fb_ui}
 </div>""",unsafe_allow_html=True)
